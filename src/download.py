@@ -2,7 +2,7 @@ import subprocess
 import os
 import zipfile
 
-def download_dataset(virus_name: str, output_dir: str = "data") -> str:
+def download_dataset(virus_name: str = "sars-cov-2", output_dir: str = "data") -> str:
     """
     Download a virus genome dataset from NCBI using the datasets CLI.
 
