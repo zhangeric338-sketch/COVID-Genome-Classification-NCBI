@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-“”"
+"""
 tools/download_data.py
 Subset and download SARS-CoV-2 assemblies (complete, human host) from NCBI Datasets.
 - Starts with metadata query
@@ -11,7 +11,7 @@ Requirements:
     Install NCBI Datasets CLI: https://www.ncbi.nlm.nih.gov/datasets/docs/v2/download-and-install/
 Usage:
     python tools/download_data.py --workers 4 --seed 42 --size-gb 8 --output /content/drive/MyDrive/sarscov2_data
-“”"
+"""
 import argparse
 import os
 import random
@@ -22,13 +22,13 @@ from joblib import Parallel, delayed
 import pandas as pd
 from tqdm import tqdm
 def run_cmd(cmd):
-    “”"Run a shell command and raise if it fails.“”"
+    """Run a shell command and raise if it fails."""
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(f”Command failed: {cmd}\n{result.stderr}“)
     return result.stdout
 def fetch_metadata(tmpdir):
-    “”"Fetch SARS-CoV-2 assembly metadata from NCBI Datasets.“”"
+    """Fetch SARS-CoV-2 assembly metadata from NCBI Datasets."""
     metadata_path = Path(tmpdir) / “sarscov2_metadata.jsonl”
     cmd = (
         “datasets summary virus genome taxon sars-cov-2 ”
@@ -39,7 +39,7 @@ def fetch_metadata(tmpdir):
     run_cmd(cmd)
     return metadata_path
 def parse_metadata(metadata_path):
-    “”"Convert JSONL metadata to DataFrame.“”"
+    """Convert JSONL metadata to DataFrame."""
     df = pd.read_json(metadata_path, lines=True)
     # Flatten for accession IDs and estimated size
     records = []
@@ -49,7 +49,7 @@ def parse_metadata(metadata_path):
         records.append({“accession”: accession, “size_bytes”: size_bytes})
     return pd.DataFrame(records)
 def sample_accessions(df, target_size_gb, seed):
-    “”"Sample accessions deterministically until ~target_size_gb is reached.“”"
+    """Sample accessions deterministically until ~target_size_gb is reached."""
     rng = random.Random(seed)
     accs = df.sample(frac=1, random_state=seed).to_dict(“records”)
     total, chosen = 0, []
@@ -61,7 +61,7 @@ def sample_accessions(df, target_size_gb, seed):
         total += rec[“size_bytes”]
     return chosen
 def download_one(acc, outdir):
-    “”"Download one accession with datasets CLI.“”"
+    """Download one accession with datasets CLI."""
     outdir = Path(outdir)
     cmd = (
         f”datasets download virus genome accession {acc} ”
@@ -71,7 +71,7 @@ def download_one(acc, outdir):
     run_cmd(cmd)
     return acc
 def download_all(accessions, outdir, workers):
-    “”"Download all accessions in parallel.“”"
+    """Download all accessions in parallel."""
     os.makedirs(outdir, exist_ok=True)
     Parallel(n_jobs=workers)(
         delayed(download_one)(acc, outdir) for acc in tqdm(accessions, desc=“Downloading”)
