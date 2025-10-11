@@ -51,24 +51,33 @@ def parse_metadata(metadata_path):
     with open(metadata_path, "r") as f:
         for line in f:
             obj = json.loads(line)
+            
+            # Only keep complete genomes
+            if obj.get("completeness") != "COMPLETE":
+                continue
+            
+            # Only human host
+            host_name = obj.get("host", {}).get("organism_name")
+            if host_name != "Homo sapiens":
+                continue
+            
             accession = obj.get("accession")
-            seq_len = obj.get("seq_length", 0)
-            assembly_level = obj.get("assembly_level", "Unknown")
-            host = obj.get("host", "Unknown")
-            lineage = obj.get("virus_pangolin") or obj.get("lineage") or "Unknown"
-
-            if accession and seq_len > 0:
-                records.append({
-                    "accession": accession,
-                    "seq_length": seq_len,
-                    "assembly_level": assembly_level,
-                    "host": host,
-                    "lineage": lineage
-                })
+            seq_len = obj.get("length", 0)
+            
+            # Variant / lineage
+            lineage = obj.get("virus", {}).get("pangolin_classification", "Unknown")
+            
+            records.append({
+                "accession": accession,
+                "lineage": lineage,
+                "seq_length": seq_len
+            })
+    
     df = pd.DataFrame(records)
-    # Keep only complete genomes from human host
-    df = df[(df['assembly_level'] == 'Complete Genome') & (df['host'] == 'Homo sapiens')]
+    df = df.dropna(subset=["accession"])
+    df = df[df["seq_length"] > 0]
     return df
+
 
 
 def sample_balanced_by_variant(df, total_gb, seed):
