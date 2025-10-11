@@ -1,14 +1,14 @@
-from src.download import download_dataset
+from src.download import download_dataset_balanced
 from src.visualization import visualize_dataset
 
 def main():
-    """
-    Download viral genome datasets from NCBI and visualize the metadata.
-    """
-    # Download dataset (you can pass virus_name/output_dir if your download_dataset supports it)
-    dataset_path = download_dataset(virus_name="sars-cov-2", output_dir="data")
-    
-    # Visualize the downloaded dataset
+    dataset_path = download_dataset_balanced(
+        virus_name="sars-cov-2",
+        output_dir="data",
+        size_gb=8,
+        seed=42,
+        workers=4
+    )
     visualize_dataset(dataset_path)
 
 if __name__ == "__main__":
