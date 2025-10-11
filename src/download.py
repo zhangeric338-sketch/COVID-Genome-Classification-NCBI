@@ -40,3 +40,32 @@ def download_dataset(virus_name: str = "sars-cov-2", output_dir: str = "data") -
 
     print(f"✅ Dataset downloaded and extracted to {extract_path}")
     return extract_path
+
+def download_dataset_balanced(
+    virus_name="sars-cov-2", output_dir="data", size_gb=8, seed=42, workers=4
+):
+    """
+    Top-level function: fetch metadata, sample balanced by variant, download subset.
+    Returns path to downloaded genomes folder.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    genomes_dir = Path(output_dir) / virus_name
+
+    # If already exists, skip
+    if genomes_dir.exists():
+        print(f"✅ Genomes folder already exists at {genomes_dir}, skipping download.")
+        return str(genomes_dir)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        print("[*] Fetching metadata...")
+        mpath = fetch_metadata(tmp)
+        print("[*] Parsing metadata...")
+        df = parse_metadata(mpath)
+        print(f"[*] Found {len(df)} entries, across {df['lineage'].nunique()} variants.")
+        print("[*] Sampling balanced subset...")
+        chosen = sample_balanced_by_variant(df, size_gb, seed)
+        print(f"[*] Selected {len(chosen)} genomes in subset (~{size_gb} GB target).")
+        print("[*] Downloading selected genomes...")
+        download_all(chosen, genomes_dir, workers=workers)
+        print("[✓] Download complete.")
+    return str(genomes_dir)
