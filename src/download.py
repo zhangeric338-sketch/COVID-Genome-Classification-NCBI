@@ -48,6 +48,17 @@ def download_dataset_balanced(
     Top-level function: fetch metadata, sample balanced by variant, download subset.
     Returns path to downloaded genomes folder.
     """
+    import argparse
+    import os
+    import subprocess
+    import tempfile
+    import random
+    import json
+    from pathlib import Path
+    from joblib import Parallel, delayed
+    import pandas as pd
+    from tqdm import tqdm
+
     os.makedirs(output_dir, exist_ok=True)
     genomes_dir = Path(output_dir) / virus_name
 
