@@ -28,15 +28,22 @@ def run_cmd(cmd):
     return result.stdout
 
 def fetch_metadata(tmpdir):
-    """
-    Fetch metadata for SARS-CoV-2 using NCBI Datasets.
-    Saves to JSONL in tmpdir and returns path.
-    """
     metadata_path = Path(tmpdir) / "sarscov2_metadata.jsonl"
-    # Only fetch metadata; filter later in Python
-    cmd = f"datasets summary virus genome taxon sars-cov-2 --as-json-lines > {metadata_path}"
-    run_cmd(cmd)
+    cmd = [
+        "datasets", "summary", "virus", "genome", "taxon", "sars-cov-2",
+        "--as-json-lines"
+    ]
+    print(f"Running command: {' '.join(cmd)}")
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"Command failed: {cmd}\n{result.stderr}")
+
+    # Save output to file in Python instead of using >
+    with open(metadata_path, "w") as f:
+        f.write(result.stdout)
+
     return metadata_path
+
 
 
 def parse_metadata(metadata_path):
