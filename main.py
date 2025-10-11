@@ -1,4 +1,4 @@
-from src.download import download_dataset_balanced
+from tools.download_data import download_dataset_balanced
 from src.visualization import visualize_dataset
 
 def main():
