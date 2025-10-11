@@ -29,55 +29,40 @@ def run_cmd(cmd):
 
 def fetch_metadata(tmpdir):
     """
-    Fetch metadata for SARS-CoV-2 (complete, human) using NCBI Datasets.
+    Fetch metadata for SARS-CoV-2 using NCBI Datasets.
     Saves to JSONL in tmpdir and returns path.
     """
     metadata_path = Path(tmpdir) / "sarscov2_metadata.jsonl"
-    # Use datasets summary or download command to get metadata lines, with filtering flags
-    # Note: using `datasets summary ... --as-json-lines` to just pull metadata
-    cmd = (
-        "datasets summary virus genome taxon sars-cov-2 "
-        "--assembly-level complete "
-        "--host 'Homo sapiens' "
-        "--as-json-lines > " + str(metadata_path)
-    )
+    # Only fetch metadata; filter later in Python
+    cmd = f"datasets summary virus genome taxon sars-cov-2 --as-json-lines > {metadata_path}"
     run_cmd(cmd)
     return metadata_path
 
+
 def parse_metadata(metadata_path):
-    """
-    Parse metadata JSONL and return a DataFrame with columns:
-    accession, lineage (or variant), seq_length
-    """
     records = []
     with open(metadata_path, "r") as f:
         for line in f:
             obj = json.loads(line)
-            # Some metadata fields; adapt based on what the JSON has
             accession = obj.get("accession")
             seq_len = obj.get("seq_length", 0)
-            # Try different fields for lineage / variant
-            lineage = None
-            # Some metadata have `virus_pangolin` or `lineage` or similar
-            if "virus_pangolin" in obj:
-                lineage = obj["virus_pangolin"]
-            elif "lineage" in obj:
-                lineage = obj["lineage"]
-            else:
-                # Maybe in nested metadata
-                lineage = obj.get("isolate_lineage") or obj.get("virus", {}).get("lineage")
-            if lineage is None:
-                lineage = "Unknown"
-            records.append({
-                "accession": accession,
-                "lineage": lineage,
-                "seq_length": seq_len
-            })
+            assembly_level = obj.get("assembly_level", "Unknown")
+            host = obj.get("host", "Unknown")
+            lineage = obj.get("virus_pangolin") or obj.get("lineage") or "Unknown"
+
+            if accession and seq_len > 0:
+                records.append({
+                    "accession": accession,
+                    "seq_length": seq_len,
+                    "assembly_level": assembly_level,
+                    "host": host,
+                    "lineage": lineage
+                })
     df = pd.DataFrame(records)
-    # Drop entries missing accession or seq_length = 0
-    df = df.dropna(subset=["accession"])
-    df = df[df["seq_length"] > 0]
+    # Keep only complete genomes from human host
+    df = df[(df['assembly_level'] == 'Complete Genome') & (df['host'] == 'Homo sapiens')]
     return df
+
 
 def sample_balanced_by_variant(df, total_gb, seed):
     """
