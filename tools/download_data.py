@@ -76,7 +76,7 @@ def download_single_genome(accession, output_path):
         print(f"    ✗ Failed to download {accession}: {e}")
         return accession, False
 
-def download_dataset_balanced(virus_name="sars-cov-2", output_dir="data", size_gb=8, seed=42, workers=4):
+def download_dataset_balanced(virus_name="sars-cov-2", output_dir="data", size_gb=0.05, seed=42, workers=4):
     """
     Download a balanced, random subset of virus genomes with deterministic sampling.
     
@@ -123,7 +123,7 @@ def download_dataset_balanced(virus_name="sars-cov-2", output_dir="data", size_g
         ]
     
     # Sample random subset based on target size
-    # Estimate ~6MB per genome, so for 8GB we need ~1333 genomes
+    # Estimate ~6MB per genome, so for 50MB we need ~8 genomes
     target_count = max(8, int(size_gb * 1024 / 6))  # At least 8, or based on size
     if len(accessions) > target_count:
         selected_accessions = random.sample(accessions, target_count)
