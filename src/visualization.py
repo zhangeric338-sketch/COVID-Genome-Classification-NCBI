@@ -91,3 +91,32 @@ def visualize_dataset(dataset_path):
         print(f"[*] Plot saved as 'download_summary.png'")
         
         print(f"[✓] Visualization complete - {len(zip_files)} genomes downloaded successfully")
+
+if __name__ == "__main__":
+    # Test the visualization with a sample dataset path
+    import os
+    
+    # Check if data directory exists
+    if os.path.exists("data"):
+        print("[*] Running visualization on existing data directory...")
+        visualize_dataset("data")
+    else:
+        print("[!] No 'data' directory found. Please run main.py first to download data.")
+        print("[*] Creating a sample visualization...")
+        
+        # Create a sample visualization for demonstration
+        import matplotlib.pyplot as plt
+        
+        # Sample data
+        sample_genomes = ["NC_045512.2", "MT123290.1", "MT188341.1", "OM095411.1", "OP912844.1"]
+        
+        plt.figure(figsize=(10, 6))
+        plt.bar(['Sample SARS-CoV-2 Genomes'], [len(sample_genomes)])
+        plt.title('Sample SARS-CoV-2 Genome Visualization')
+        plt.ylabel('Number of Genomes')
+        plt.tight_layout()
+        plt.show()
+        
+        plt.savefig('sample_visualization.png', dpi=150, bbox_inches='tight')
+        print(f"[*] Sample plot saved as 'sample_visualization.png'")
+        print("[✓] Sample visualization complete!")
