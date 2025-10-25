@@ -1,14 +1,8 @@
-from tools.download_data import download_dataset_balanced
+from tools.download_data import download_small_subset
 from src.visualization import visualize_dataset
 
 def main():
-    dataset_path = download_dataset_balanced(
-        virus_name="sars-cov-2",
-        output_dir="data",
-        size_gb=8,
-        seed=42,
-        workers=4
-    )
+    dataset_path = download_small_subset("data")
     visualize_dataset(dataset_path)
 
 if __name__ == "__main__":
