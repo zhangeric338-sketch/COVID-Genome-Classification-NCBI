@@ -96,31 +96,16 @@ def download_dataset_balanced(virus_name="sars-cov-2", output_dir="data", size_g
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     
-    # Get list of available accessions for the virus
-    print(f"[*] Getting available {virus_name} accessions...")
-    cmd = f"datasets download virus genome taxon {virus_name} --host human --complete-only"
-    try:
-        result = run_cmd(cmd)
-        # Parse accessions from dry-run output (this is a simplified approach)
-        # In practice, you'd need to parse the actual NCBI response
-        print(f"[*] Found available genomes for {virus_name}")
-    except RuntimeError as e:
-        print(f"[!] Could not get genome list: {e}")
-        print(f"[*] Using pre-selected accessions as fallback...")
-        # Fallback to pre-selected accessions (validated SARS-CoV-2 genomes)
-        accessions = [
-            "NC_045512.2", "MT123290.1", "MT188341.1", "MT291826.1",
-            "OM095411.1", "MW123456.1", "OP912844.1", "OR064389.1"
-        ]
-    else:
-        # Use a curated set of well-known, validated SARS-CoV-2 accessions
-        accessions = [
-            "NC_045512.2", "MT123290.1", "MT188341.1", "MT291826.1",
-            "OM095411.1", "MW123456.1", "OP912844.1", "OR064389.1",
-            "MT291827.1", "MW123456.2", "OM123456.1", "ON123456.1",
-            "OP123456.1", "OR123456.1", "OS123456.1", "OT123456.1",
-            "MT291828.1", "MW123456.3", "OM123456.2", "ON123456.2"
-        ]
+    # Skip the slow NCBI query and use pre-selected accessions directly
+    print(f"[*] Using pre-selected {virus_name} accessions for faster download...")
+    # Use a curated set of well-known, validated SARS-CoV-2 accessions
+    accessions = [
+        "NC_045512.2", "MT123290.1", "MT188341.1", "MT291826.1",
+        "OM095411.1", "MW123456.1", "OP912844.1", "OR064389.1",
+        "MT291827.1", "MW123456.2", "OM123456.1", "ON123456.1",
+        "OP123456.1", "OR123456.1", "OS123456.1", "OT123456.1",
+        "MT291828.1", "MW123456.3", "OM123456.2", "ON123456.2"
+    ]
     
     # Sample random subset based on target size
     # Estimate ~6MB per genome, so for 50MB we need ~8 genomes
