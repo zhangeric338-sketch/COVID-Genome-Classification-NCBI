@@ -33,23 +33,44 @@ def visualize_dataset(dataset_path):
     Args:
         dataset_path (str): Path to the extracted dataset folder returned by download_dataset().
     """
-    # Path to metadata file
+    # Check if this is a bulk dataset or individual genome downloads
     metadata_file = os.path.join(dataset_path, "ncbi_dataset", "metadata", "genome_metadata.jsonl")
-    if not os.path.exists(metadata_file):
-        raise FileNotFoundError(f"Metadata file not found: {metadata_file}")
+    
+    if os.path.exists(metadata_file):
+        # Bulk dataset format
+        print(f"Loading metadata from {metadata_file}…")
+        df = load_metadata(metadata_file)
+        print(f"Metadata contains {len(df)} genomes with {len(df.columns)} fields.")
+        
+        # Plot top collection dates
+        if "collection_date" in df.columns:
+            plot_counts(df, "collection_date", "Genomes by Collection Date", "Collection Date", top_n=20)
 
-    print(f"Loading metadata from {metadata_file}…")
-    df = load_metadata(metadata_file)
-    print(f"Metadata contains {len(df)} genomes with {len(df.columns)} fields.")
+        # Plot hosts
+        if "host" in df.columns:
+            plot_counts(df, "host", "Genomes by Host", "Host")
 
-    # Plot top collection dates
-    if "collection_date" in df.columns:
-        plot_counts(df, "collection_date", "Genomes by Collection Date", "Collection Date", top_n=20)
-
-    # Plot hosts
-    if "host" in df.columns:
-        plot_counts(df, "host", "Genomes by Host", "Host")
-
-    # Plot locations
-    if "geo_loc_name" in df.columns:
-        plot_counts(df, "geo_loc_name", "Genomes by Location", "Country / Location", top_n=20)
+        # Plot locations
+        if "geo_loc_name" in df.columns:
+            plot_counts(df, "geo_loc_name", "Genomes by Location", "Country / Location", top_n=20)
+    else:
+        # Individual genome downloads - create simple summary
+        print(f"[*] Individual genome downloads detected in {dataset_path}")
+        
+        # Count downloaded files
+        zip_files = [f for f in os.listdir(dataset_path) if f.endswith('.zip')]
+        print(f"[*] Found {len(zip_files)} downloaded genome files:")
+        for i, zip_file in enumerate(zip_files, 1):
+            print(f"  {i}. {zip_file}")
+        
+        # Create a simple visualization showing download summary
+        import matplotlib.pyplot as plt
+        
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.bar(['Downloaded Genomes'], [len(zip_files)])
+        ax.set_title(f'SARS-CoV-2 Genome Downloads ({len(zip_files)} genomes)')
+        ax.set_ylabel('Number of Genomes')
+        plt.tight_layout()
+        plt.show()
+        
+        print(f"[✓] Visualization complete - {len(zip_files)} genomes downloaded successfully")
