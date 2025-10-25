@@ -64,8 +64,8 @@ def download_single_genome(accession, output_path):
     print(f"Downloading {accession}...")
     cmd = (
         f"datasets download virus genome accession {accession} "
-        f"--include genome,annotation_report "
-        f"--host human --assembly-level complete "
+        f"--include genome,annotation "
+        f"--host human --complete-only "
         f"--filename {output_path}/{accession}.zip --no-progressbar"
     )
     try:
@@ -98,7 +98,7 @@ def download_dataset_balanced(virus_name="sars-cov-2", output_dir="data", size_g
     
     # Get list of available accessions for the virus
     print(f"[*] Getting available {virus_name} accessions...")
-    cmd = f"datasets download virus genome taxon {virus_name} --host human --assembly-level complete --dry-run"
+    cmd = f"datasets download virus genome taxon {virus_name} --host human --complete-only --dry-run"
     try:
         result = run_cmd(cmd)
         # Parse accessions from dry-run output (this is a simplified approach)
