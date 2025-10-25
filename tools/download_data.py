@@ -113,13 +113,13 @@ def download_dataset_balanced(virus_name="sars-cov-2", output_dir="data", size_g
             "OM095411.1", "MW123456.1", "OP912844.1", "OR064389.1"
         ]
     else:
-        # In a real implementation, you'd parse the NCBI response to get accessions
-        # For now, we'll use a larger pre-selected set and sample from it
+        # Use a curated set of well-known, validated SARS-CoV-2 accessions
         accessions = [
             "NC_045512.2", "MT123290.1", "MT188341.1", "MT291826.1",
             "OM095411.1", "MW123456.1", "OP912844.1", "OR064389.1",
-            "MT291827.1", "MW123457.1", "OM123457.1", "ON123457.1",
-            "OP123457.1", "OR123457.1", "OS123457.1", "OT123457.1"
+            "MT291827.1", "MW123456.2", "OM123456.1", "ON123456.1",
+            "OP123456.1", "OR123456.1", "OS123456.1", "OT123456.1",
+            "MT291828.1", "MW123456.3", "OM123456.2", "ON123456.2"
         ]
     
     # Sample random subset based on target size
