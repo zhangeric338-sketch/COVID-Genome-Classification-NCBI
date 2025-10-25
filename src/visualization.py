@@ -75,6 +75,8 @@ def visualize_dataset(dataset_path):
         
         # Create a simple visualization showing download summary
         import matplotlib.pyplot as plt
+        import matplotlib
+        matplotlib.use('Agg')  # Use non-interactive backend
         
         # Ensure plots display in Google Colab
         plt.figure(figsize=(10, 6))
@@ -83,12 +85,20 @@ def visualize_dataset(dataset_path):
         plt.ylabel('Number of Genomes')
         plt.tight_layout()
         
-        # Display the plot in Google Colab
-        plt.show()
-        
-        # Also save the plot as an image file
+        # Save the plot as an image file
         plt.savefig('download_summary.png', dpi=150, bbox_inches='tight')
         print(f"[*] Plot saved as 'download_summary.png'")
+        
+        # Display the plot in Google Colab using IPython
+        try:
+            from IPython.display import Image, display
+            display(Image('download_summary.png'))
+            print("[*] Plot displayed inline")
+        except ImportError:
+            print("[*] Plot saved as image file (IPython not available for inline display)")
+        
+        # Also try to show the plot directly
+        plt.show()
         
         print(f"[✓] Visualization complete - {len(zip_files)} genomes downloaded successfully")
 
@@ -106,6 +116,8 @@ if __name__ == "__main__":
         
         # Create a sample visualization for demonstration
         import matplotlib.pyplot as plt
+        import matplotlib
+        matplotlib.use('Agg')  # Use non-interactive backend
         
         # Sample data
         sample_genomes = ["NC_045512.2", "MT123290.1", "MT188341.1", "OM095411.1", "OP912844.1"]
@@ -115,8 +127,17 @@ if __name__ == "__main__":
         plt.title('Sample SARS-CoV-2 Genome Visualization')
         plt.ylabel('Number of Genomes')
         plt.tight_layout()
-        plt.show()
         
         plt.savefig('sample_visualization.png', dpi=150, bbox_inches='tight')
         print(f"[*] Sample plot saved as 'sample_visualization.png'")
+        
+        # Display the plot in Google Colab using IPython
+        try:
+            from IPython.display import Image, display
+            display(Image('sample_visualization.png'))
+            print("[*] Sample plot displayed inline")
+        except ImportError:
+            print("[*] Sample plot saved as image file (IPython not available for inline display)")
+        
+        plt.show()
         print("[✓] Sample visualization complete!")
