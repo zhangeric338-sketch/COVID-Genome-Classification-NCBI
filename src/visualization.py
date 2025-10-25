@@ -18,13 +18,23 @@ def plot_counts(df, column, title, xlabel, ylabel="Count", top_n=None):
     counts = df[column].value_counts()
     if top_n:
         counts = counts.head(top_n)
-    counts.plot(kind="bar", figsize=(12,6))
+    
+    # Create plot for Google Colab
+    plt.figure(figsize=(12, 6))
+    counts.plot(kind="bar")
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.xticks(rotation=45, ha="right")
     plt.tight_layout()
+    
+    # Display in Google Colab
     plt.show()
+    
+    # Save plot as image
+    filename = f"{column.lower().replace(' ', '_')}_plot.png"
+    plt.savefig(filename, dpi=150, bbox_inches='tight')
+    print(f"[*] Plot saved as '{filename}'")
 
 def visualize_dataset(dataset_path):
     """
@@ -66,11 +76,18 @@ def visualize_dataset(dataset_path):
         # Create a simple visualization showing download summary
         import matplotlib.pyplot as plt
         
-        fig, ax = plt.subplots(figsize=(10, 6))
-        ax.bar(['Downloaded Genomes'], [len(zip_files)])
-        ax.set_title(f'SARS-CoV-2 Genome Downloads ({len(zip_files)} genomes)')
-        ax.set_ylabel('Number of Genomes')
+        # Ensure plots display in Google Colab
+        plt.figure(figsize=(10, 6))
+        plt.bar(['Downloaded Genomes'], [len(zip_files)])
+        plt.title(f'SARS-CoV-2 Genome Downloads ({len(zip_files)} genomes)')
+        plt.ylabel('Number of Genomes')
         plt.tight_layout()
+        
+        # Display the plot in Google Colab
         plt.show()
+        
+        # Also save the plot as an image file
+        plt.savefig('download_summary.png', dpi=150, bbox_inches='tight')
+        print(f"[*] Plot saved as 'download_summary.png'")
         
         print(f"[✓] Visualization complete - {len(zip_files)} genomes downloaded successfully")
