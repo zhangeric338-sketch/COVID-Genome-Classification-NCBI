@@ -207,7 +207,7 @@ def download_dataset_balanced(virus_name="sars-cov-2", output_dir="data", size_g
     Args:
         virus_name (str): Virus name (e.g., "sars-cov-2")
         output_dir (str): Output directory
-        size_gb (float): Target size in GB
+        size_gb (float or None): Target size in GB. If None, downloads full dataset (all accessions)
         seed (int): Random seed for deterministic sampling
         workers (int): Number of parallel workers
     
@@ -275,13 +275,21 @@ def download_dataset_balanced(virus_name="sars-cov-2", output_dir="data", size_g
         "MT123293.1"    # Early variant - PROVEN
     ]
     
-    # Sample random subset based on target size
-    # Estimate ~6MB per genome, so for 50MB we need ~8 genomes
-    target_count = max(8, int(size_gb * 1024 / 6))  # At least 8, or based on size
-    if len(accessions) > target_count:
-        selected_accessions = random.sample(accessions, target_count)
-    else:
+    # Sample random subset based on target size (or use all for full dataset)
+    if size_gb is None:
+        # Full dataset mode: use all accessions
         selected_accessions = accessions
+        print(f"[*] Full dataset mode: using all {len(accessions)} accessions")
+    else:
+        # Partial dataset mode: sample based on target size
+        # Estimate ~6MB per genome, so for 50MB we need ~8 genomes
+        target_count = max(8, int(size_gb * 1024 / 6))  # At least 8, or based on size
+        if len(accessions) > target_count:
+            selected_accessions = random.sample(accessions, target_count)
+            print(f"[*] Partial dataset mode: sampling {target_count} from {len(accessions)} accessions")
+        else:
+            selected_accessions = accessions
+            print(f"[*] Partial dataset mode: using all {len(accessions)} accessions (less than target)")
     
     # Filter out already downloaded accessions
     accessions_to_download = [acc for acc in selected_accessions if acc not in existing_accessions]
@@ -295,7 +303,10 @@ def download_dataset_balanced(virus_name="sars-cov-2", output_dir="data", size_g
         print(f"[*] All selected accessions already downloaded, skipping download")
         return str(output_path)
     
-    print(f"[*] Downloading {len(accessions_to_download)} {virus_name} genomes (target: {size_gb}GB)")
+    if size_gb is None:
+        print(f"[*] Downloading {len(accessions_to_download)} {virus_name} genomes (full dataset)")
+    else:
+        print(f"[*] Downloading {len(accessions_to_download)} {virus_name} genomes (target: {size_gb}GB)")
     print(f"[*] Using {workers} workers with seed {seed}")
     
     # Check CLI availability and inform user
