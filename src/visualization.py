@@ -1,10 +1,17 @@
 import json
 import os
-import matplotlib.pyplot as plt
-import pandas as pd
 import shutil
 import random
 from pathlib import Path
+
+try:
+    import matplotlib.pyplot as plt  # type: ignore
+    import pandas as pd  # type: ignore
+except ImportError as e:
+    raise ImportError(
+        f"Required packages not installed: {e}\n"
+        "Please install with: pip install matplotlib pandas"
+    ) from e
 
 def load_metadata(jsonl_path):
     """Load NCBI genome metadata from JSON Lines file into a DataFrame."""
@@ -77,11 +84,7 @@ def visualize_dataset(dataset_path):
             print(f"  {i}. {zip_file}")
         
         # Create a simple visualization showing download summary
-        import matplotlib.pyplot as plt
-        import matplotlib
-        matplotlib.use('Agg')  # Use non-interactive backend
         
-        # Ensure plots display in Google Colab
         plt.figure(figsize=(10, 6))
         plt.bar(['Downloaded Genomes'], [len(zip_files)])
         plt.title(f'SARS-CoV-2 Genome Downloads ({len(zip_files)} genomes)')
@@ -92,16 +95,9 @@ def visualize_dataset(dataset_path):
         plt.savefig('download_summary.png', dpi=150, bbox_inches='tight')
         print(f"[*] Plot saved as 'download_summary.png'")
         
-        # Display the plot in Google Colab using IPython
-        try:
-            from IPython.display import Image, display
-            display(Image('download_summary.png'))
-            print("[*] Plot displayed inline")
-        except ImportError:
-            print("[*] Plot saved as image file (IPython not available for inline display)")
-        
-        # Also try to show the plot directly
+        # Display the plot
         plt.show()
+        print("[*] Plot displayed")
         
         print(f"[✓] Visualization complete - {len(zip_files)} genomes downloaded successfully")
 
@@ -237,9 +233,6 @@ def visualize_train_test_split(data_dir):
     test_files = list(test_dir.glob("*.zip"))
     
     # Create visualization
-    import matplotlib.pyplot as plt
-    import matplotlib
-    matplotlib.use('Agg')
     
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
     
@@ -267,15 +260,9 @@ def visualize_train_test_split(data_dir):
     plt.savefig('train_test_split.png', dpi=150, bbox_inches='tight')
     print(f"[*] Train/test split plot saved as 'train_test_split.png'")
     
-    # Display in Google Colab
-    try:
-        from IPython.display import Image, display
-        display(Image('train_test_split.png'))
-        print("[*] Train/test split plot displayed inline")
-    except ImportError:
-        print("[*] Train/test split plot saved as image file")
-    
+    # Display the plot
     plt.show()
+    print("[*] Train/test split plot displayed")
     
     print(f"[✓] Train/test visualization complete:")
     print(f"  - Train: {len(train_files)} genomes")
@@ -320,9 +307,6 @@ def visualize_dataset_composition(data_dir):
     test_variants = analyze_variants(test_files)
     
     # Create comprehensive visualization
-    import matplotlib.pyplot as plt
-    import matplotlib
-    matplotlib.use('Agg')
     
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
     
@@ -391,15 +375,9 @@ def visualize_dataset_composition(data_dir):
     plt.savefig('dataset_composition.png', dpi=150, bbox_inches='tight')
     print(f"[*] Dataset composition plot saved as 'dataset_composition.png'")
     
-    # Display in Google Colab
-    try:
-        from IPython.display import Image, display
-        display(Image('dataset_composition.png'))
-        print("[*] Dataset composition plot displayed inline")
-    except ImportError:
-        print("[*] Dataset composition plot saved as image file")
-    
+    # Display the plot
     plt.show()
+    print("[*] Dataset composition plot displayed")
     
     # Print detailed summary
     print(f"\n[✓] Dataset Composition Analysis:")
@@ -446,9 +424,6 @@ if __name__ == "__main__":
         print("[*] Creating a sample visualization...")
         
         # Create a sample visualization for demonstration
-        import matplotlib.pyplot as plt
-        import matplotlib
-        matplotlib.use('Agg')  # Use non-interactive backend
         
         # Sample data
         sample_genomes = ["NC_045512.2", "MT123290.1", "MT188341.1", "OM095411.1", "OP912844.1"]
@@ -462,13 +437,7 @@ if __name__ == "__main__":
         plt.savefig('sample_visualization.png', dpi=150, bbox_inches='tight')
         print(f"[*] Sample plot saved as 'sample_visualization.png'")
         
-        # Display the plot in Google Colab using IPython
-        try:
-            from IPython.display import Image, display
-            display(Image('sample_visualization.png'))
-            print("[*] Sample plot displayed inline")
-        except ImportError:
-            print("[*] Sample plot saved as image file (IPython not available for inline display)")
-        
+        # Display the plot
         plt.show()
+        print("[*] Sample plot displayed")
         print("[✓] Sample visualization complete!")
