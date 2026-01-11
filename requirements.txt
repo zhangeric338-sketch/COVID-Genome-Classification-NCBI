@@ -1,3 +1,5 @@
 ncbi-datasets-pylib
 click
 requests
+matplotlib
+pandas

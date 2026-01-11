@@ -1,10 +1,17 @@
 import json
 import os
-import matplotlib.pyplot as plt
-import pandas as pd
 import shutil
 import random
 from pathlib import Path
+
+try:
+    import matplotlib.pyplot as plt  # type: ignore
+    import pandas as pd  # type: ignore
+except ImportError as e:
+    raise ImportError(
+        f"Required packages not installed: {e}\n"
+        "Please install with: pip install matplotlib pandas"
+    ) from e
 
 def load_metadata(jsonl_path):
     """Load NCBI genome metadata from JSON Lines file into a DataFrame."""
@@ -77,11 +84,7 @@ def visualize_dataset(dataset_path):
             print(f"  {i}. {zip_file}")
         
         # Create a simple visualization showing download summary
-        import matplotlib.pyplot as plt
-        import matplotlib
-        matplotlib.use('Agg')  # Use non-interactive backend
         
-        # Ensure plots display in Google Colab
         plt.figure(figsize=(10, 6))
         plt.bar(['Downloaded Genomes'], [len(zip_files)])
         plt.title(f'SARS-CoV-2 Genome Downloads ({len(zip_files)} genomes)')
@@ -92,28 +95,22 @@ def visualize_dataset(dataset_path):
         plt.savefig('download_summary.png', dpi=150, bbox_inches='tight')
         print(f"[*] Plot saved as 'download_summary.png'")
         
-        # Display the plot in Google Colab using IPython
-        try:
-            from IPython.display import Image, display
-            display(Image('download_summary.png'))
-            print("[*] Plot displayed inline")
-        except ImportError:
-            print("[*] Plot saved as image file (IPython not available for inline display)")
-        
-        # Also try to show the plot directly
+        # Display the plot
         plt.show()
+        print("[*] Plot displayed")
         
         print(f"[✓] Visualization complete - {len(zip_files)} genomes downloaded successfully")
 
 def split_dataset(data_dir, test_ratio=0.2, random_seed=42, balance_variants=True):
     """
-    Split downloaded genome files into train and test datasets with balanced variant representation.
+    Split downloaded genome files into train and test datasets with balanced strain representation.
+    Ensures equal number of genomes from each strain in both train and test sets.
     
     Args:
         data_dir (str): Directory containing downloaded genome files
         test_ratio (float): Proportion of data to use for testing (default: 0.2)
         random_seed (int): Random seed for reproducible splits (default: 42)
-        balance_variants (bool): Whether to balance variant representation (default: True)
+        balance_variants (bool): Whether to balance strain representation (default: True)
     
     Returns:
         tuple: (train_files, test_files) - lists of file paths
@@ -132,63 +129,83 @@ def split_dataset(data_dir, test_ratio=0.2, random_seed=42, balance_variants=Tru
     print(f"[*] Found {len(zip_files)} genome files to split")
     
     if balance_variants:
-        # Group files by variant type (based on accession patterns)
-        variant_groups = {}
+        # Define strain mapping based on accession patterns
+        # This matches the structure in download_data.py
+        def get_strain_from_accession(accession):
+            """Map accession to strain type."""
+            if accession == "NC_045512.2" or accession == "NC_045512.1":
+                return "Reference"
+            elif accession.startswith("MT"):
+                # Check if it's Alpha (188xxx, 326xxx) or Beta (291xxx) or Reference/Early
+                acc_num = accession.split(".")[0]
+                if "188" in acc_num or "326" in acc_num:
+                    return "Alpha"
+                elif "291" in acc_num:
+                    return "Beta"
+                else:
+                    return "Reference"  # Early/Reference variants
+            elif accession.startswith("MW"):
+                # Check if it's Gamma (633477-633496) or Delta (633497+)
+                try:
+                    num = int(accession.split(".")[0].replace("MW", ""))
+                    if 633477 <= num <= 633496:
+                        return "Gamma"
+                    else:
+                        return "Delta"
+                except:
+                    return "Delta"  # Default to Delta for MW accessions
+            elif accession.startswith("OM"):
+                return "Omicron"
+            elif accession.startswith("ON") or accession.startswith("OP") or accession.startswith("OR"):
+                return "Recent"
+            else:
+                return "Other"
+        
+        # Group files by strain type
+        strain_groups = {}
         for file_path in zip_files:
             accession = file_path.stem  # Remove .zip extension
+            strain_type = get_strain_from_accession(accession)
             
-            # Determine variant type based on accession patterns
-            if accession == "NC_045512.2":
-                variant_type = "Reference"
-            elif accession.startswith("MT"):
-                variant_type = "Early/Alpha"
-            elif accession.startswith("MW"):
-                variant_type = "Delta"
-            elif accession.startswith("OM"):
-                variant_type = "Omicron"
-            elif accession.startswith("ON"):
-                variant_type = "Recent"
-            elif accession.startswith("OP"):
-                variant_type = "Recent"
-            elif accession.startswith("OR"):
-                variant_type = "Recent"
-            else:
-                variant_type = "Other"
-            
-            if variant_type not in variant_groups:
-                variant_groups[variant_type] = []
-            variant_groups[variant_type].append(file_path)
+            if strain_type not in strain_groups:
+                strain_groups[strain_type] = []
+            strain_groups[strain_type].append(file_path)
         
-        # Print variant distribution
-        print(f"[*] Variant distribution:")
-        for variant, files in variant_groups.items():
-            print(f"  - {variant}: {len(files)} genomes")
+        # Print strain distribution
+        print(f"[*] Strain distribution:")
+        for strain, files in sorted(strain_groups.items()):
+            print(f"  - {strain}: {len(files)} genomes")
         
-        # Split each variant group proportionally
+        # Split each strain group proportionally with equal representation
         train_files = []
         test_files = []
         
-        for variant, files in variant_groups.items():
+        for strain, files in sorted(strain_groups.items()):
             if len(files) == 0:
                 continue
                 
-            # Shuffle files within this variant
+            # Shuffle files within this strain
             random.shuffle(files)
             
-            # Calculate split for this variant
-            test_size = max(1, int(len(files) * test_ratio)) if len(files) > 1 else 0
+            # Calculate split for this strain - ensure at least 1 in test if possible
+            if len(files) == 1:
+                # If only 1 file, put it in train
+                test_size = 0
+            else:
+                test_size = max(1, int(len(files) * test_ratio))
+            
             train_size = len(files) - test_size
             
-            # Split this variant
-            variant_test = files[:test_size]
-            variant_train = files[test_size:]
+            # Split this strain
+            strain_test = files[:test_size]
+            strain_train = files[test_size:]
             
-            train_files.extend(variant_train)
-            test_files.extend(variant_test)
+            train_files.extend(strain_train)
+            test_files.extend(strain_test)
             
-            print(f"  - {variant}: {len(variant_train)} train, {len(variant_test)} test")
+            print(f"  - {strain}: {len(strain_train)} train, {len(strain_test)} test")
         
-        print(f"[*] Balanced split ensures each variant is represented in both train and test")
+        print(f"[*] Balanced split ensures each strain is represented proportionally in both train and test")
         
     else:
         # Original random split (no balancing)
@@ -206,6 +223,9 @@ def split_dataset(data_dir, test_ratio=0.2, random_seed=42, balance_variants=Tru
     test_dir.mkdir(exist_ok=True)
     
     # Copy files to respective directories
+    train_size = len(train_files)
+    test_size = len(test_files)
+    
     print(f"[*] Creating train dataset ({train_size} files)...")
     for file_path in train_files:
         shutil.copy2(file_path, train_dir / file_path.name)
@@ -237,9 +257,6 @@ def visualize_train_test_split(data_dir):
     test_files = list(test_dir.glob("*.zip"))
     
     # Create visualization
-    import matplotlib.pyplot as plt
-    import matplotlib
-    matplotlib.use('Agg')
     
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
     
@@ -267,15 +284,9 @@ def visualize_train_test_split(data_dir):
     plt.savefig('train_test_split.png', dpi=150, bbox_inches='tight')
     print(f"[*] Train/test split plot saved as 'train_test_split.png'")
     
-    # Display in Google Colab
-    try:
-        from IPython.display import Image, display
-        display(Image('train_test_split.png'))
-        print("[*] Train/test split plot displayed inline")
-    except ImportError:
-        print("[*] Train/test split plot saved as image file")
-    
+    # Display the plot
     plt.show()
+    print("[*] Train/test split plot displayed")
     
     print(f"[✓] Train/test visualization complete:")
     print(f"  - Train: {len(train_files)} genomes")
@@ -297,22 +308,38 @@ def visualize_dataset_composition(data_dir):
     
     # Analyze variant composition
     def analyze_variants(files):
+        def get_strain_from_accession(accession):
+            """Map accession to strain type."""
+            if accession == "NC_045512.2" or accession == "NC_045512.1":
+                return "Reference"
+            elif accession.startswith("MT"):
+                acc_num = accession.split(".")[0]
+                if "188" in acc_num or "326" in acc_num:
+                    return "Alpha"
+                elif "291" in acc_num:
+                    return "Beta"
+                else:
+                    return "Reference"
+            elif accession.startswith("MW"):
+                try:
+                    num = int(accession.split(".")[0].replace("MW", ""))
+                    if 633477 <= num <= 633496:
+                        return "Gamma"
+                    else:
+                        return "Delta"
+                except:
+                    return "Delta"
+            elif accession.startswith("OM"):
+                return "Omicron"
+            elif accession.startswith("ON") or accession.startswith("OP") or accession.startswith("OR"):
+                return "Recent"
+            else:
+                return "Other"
+        
         variant_counts = {}
         for file_path in files:
             accession = file_path.stem
-            if accession == "NC_045512.2":
-                variant_type = "Reference"
-            elif accession.startswith("MT"):
-                variant_type = "Early/Alpha"
-            elif accession.startswith("MW"):
-                variant_type = "Delta"
-            elif accession.startswith("OM"):
-                variant_type = "Omicron"
-            elif accession.startswith("ON") or accession.startswith("OP") or accession.startswith("OR"):
-                variant_type = "Recent"
-            else:
-                variant_type = "Other"
-            
+            variant_type = get_strain_from_accession(accession)
             variant_counts[variant_type] = variant_counts.get(variant_type, 0) + 1
         return variant_counts
     
@@ -320,9 +347,6 @@ def visualize_dataset_composition(data_dir):
     test_variants = analyze_variants(test_files)
     
     # Create comprehensive visualization
-    import matplotlib.pyplot as plt
-    import matplotlib
-    matplotlib.use('Agg')
     
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
     
@@ -391,15 +415,9 @@ def visualize_dataset_composition(data_dir):
     plt.savefig('dataset_composition.png', dpi=150, bbox_inches='tight')
     print(f"[*] Dataset composition plot saved as 'dataset_composition.png'")
     
-    # Display in Google Colab
-    try:
-        from IPython.display import Image, display
-        display(Image('dataset_composition.png'))
-        print("[*] Dataset composition plot displayed inline")
-    except ImportError:
-        print("[*] Dataset composition plot saved as image file")
-    
+    # Display the plot
     plt.show()
+    print("[*] Dataset composition plot displayed")
     
     # Print detailed summary
     print(f"\n[✓] Dataset Composition Analysis:")
@@ -446,9 +464,6 @@ if __name__ == "__main__":
         print("[*] Creating a sample visualization...")
         
         # Create a sample visualization for demonstration
-        import matplotlib.pyplot as plt
-        import matplotlib
-        matplotlib.use('Agg')  # Use non-interactive backend
         
         # Sample data
         sample_genomes = ["NC_045512.2", "MT123290.1", "MT188341.1", "OM095411.1", "OP912844.1"]
@@ -462,13 +477,7 @@ if __name__ == "__main__":
         plt.savefig('sample_visualization.png', dpi=150, bbox_inches='tight')
         print(f"[*] Sample plot saved as 'sample_visualization.png'")
         
-        # Display the plot in Google Colab using IPython
-        try:
-            from IPython.display import Image, display
-            display(Image('sample_visualization.png'))
-            print("[*] Sample plot displayed inline")
-        except ImportError:
-            print("[*] Sample plot saved as image file (IPython not available for inline display)")
-        
+        # Display the plot
         plt.show()
+        print("[*] Sample plot displayed")
         print("[✓] Sample visualization complete!")

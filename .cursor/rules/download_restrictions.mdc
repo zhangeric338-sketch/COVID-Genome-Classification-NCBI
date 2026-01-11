@@ -1,0 +1,35 @@
+---
+description: "Restrictions and guidelines for downloading data from NCBI"
+globs: ["**/download*.py", "**/main.py"]
+alwaysApply: true
+---
+
+# Download Data Restrictions
+
+## Default Behavior
+- **Default dataset size**: 0.05 GB (partial dataset)
+- **Full dataset**: Requires explicit `--full-dataset` flag
+- **Never download full dataset by default** - always use partial dataset unless user explicitly requests full dataset
+
+## Download Parameters
+- **Size limit**: Default to 0.05 GB for partial downloads
+- **Seed**: Use seed=42 for deterministic sampling (default)
+- **Workers**: Default to 4 parallel workers
+- **Output directory**: Default to "data" directory
+
+## Important Restrictions
+1. **Always warn the user** before downloading large datasets (>1 GB)
+2. **Never download full dataset** without explicit user request
+3. **Check for existing files** before downloading to avoid duplicates
+4. **Respect NCBI API rate limits** - use appropriate timeouts and retry logic
+5. **Verify downloads** - ensure files are valid and not empty before proceeding
+
+## Usage
+- Partial dataset: `python main.py` or `python main.py --size-gb 0.05`
+- Full dataset: `python main.py --full-dataset` (requires explicit flag)
+- Query size only: `python main.py --query-size`
+
+## Download Script
+- Primary script: `tools/download_data.py`
+- Uses balanced sampling across virus strains
+- Supports both NCBI CLI and API fallback methods
