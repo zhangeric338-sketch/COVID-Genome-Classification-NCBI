@@ -31,7 +31,7 @@ def main():
         "--workers",
         type=int,
         default=4,
-        help="Number of parallel download workers (default: 4)"
+        help="Number of parallel download workers (default: 4, max: 16)"
     )
     parser.add_argument(
         "--query-size",
@@ -40,7 +40,16 @@ def main():
     )
     
     args = parser.parse_args()
-    
+
+    # Validate workers parameter (cap at reasonable maximum)
+    MAX_WORKERS = 16
+    if args.workers < 1:
+        print(f"[!] Invalid workers value ({args.workers}). Using minimum: 1")
+        args.workers = 1
+    elif args.workers > MAX_WORKERS:
+        print(f"[!] Workers value ({args.workers}) exceeds maximum. Using: {MAX_WORKERS}")
+        args.workers = MAX_WORKERS
+
     # If query-size flag is set, just query and exit
     if args.query_size:
         result = query_ncbi_genome_count(virus_name="sars-cov-2", host="human", complete_only=True)

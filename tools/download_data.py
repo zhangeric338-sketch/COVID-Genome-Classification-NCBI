@@ -24,6 +24,89 @@ def check_cli_available():
     """Check if NCBI datasets CLI is available."""
     return shutil.which("datasets") is not None
 
+
+def query_ncbi_genome_count(virus_name="sars-cov-2", host="human", complete_only=True):
+    """
+    Query NCBI for total count and estimated size of available genomes.
+
+    Args:
+        virus_name (str): Virus name to query (default: "sars-cov-2")
+        host (str): Host filter (default: "human")
+        complete_only (bool): Whether to filter for complete genomes only (default: True)
+
+    Returns:
+        dict: Dictionary with total_count, estimated_size_mb, estimated_size_gb, estimated_size_tb
+              Returns None if query fails.
+    """
+    try:
+        # Use NCBI Datasets API to get summary
+        api_url = f"https://api.ncbi.nlm.nih.gov/datasets/v2alpha/virus/taxon/{virus_name}/genome/summary"
+
+        params = {"host": host}
+        if complete_only:
+            params["complete_only"] = "true"
+
+        query_string = urllib.parse.urlencode(params)
+        full_url = f"{api_url}?{query_string}"
+
+        req = urllib.request.Request(
+            full_url,
+            headers={"Accept": "application/json"}
+        )
+
+        print(f"[*] Querying NCBI for {virus_name} genome count...")
+
+        with urllib.request.urlopen(req, timeout=30) as response:
+            data = json.loads(response.read().decode('utf-8'))
+
+            # Extract count from response
+            total_count = data.get('total_count', 0)
+
+            # Estimate size based on ~6MB per genome
+            estimated_size_mb = total_count * 6
+            estimated_size_gb = estimated_size_mb / 1024
+            estimated_size_tb = estimated_size_gb / 1024
+
+            return {
+                'total_count': total_count,
+                'estimated_size_mb': estimated_size_mb,
+                'estimated_size_gb': estimated_size_gb,
+                'estimated_size_tb': estimated_size_tb
+            }
+
+    except urllib.error.HTTPError as e:
+        print(f"[!] HTTP error querying NCBI: {e.code} - {e.reason}")
+        return None
+    except urllib.error.URLError as e:
+        print(f"[!] URL error querying NCBI: {str(e)}")
+        return None
+    except json.JSONDecodeError as e:
+        print(f"[!] Failed to parse NCBI response: {str(e)}")
+        return None
+    except Exception as e:
+        print(f"[!] Failed to query NCBI: {str(e)}")
+        return None
+
+def check_write_permission(directory_path):
+    """
+    Check if the directory is writable by attempting to create a temp file.
+
+    Args:
+        directory_path: Path to the directory to check
+
+    Returns:
+        bool: True if writable, False otherwise
+    """
+    import tempfile
+    try:
+        test_file = Path(directory_path) / f".write_test_{os.getpid()}"
+        test_file.touch()
+        test_file.unlink()
+        return True
+    except (PermissionError, OSError):
+        return False
+
+
 def run_cmd(cmd):
     """Run a shell command and raise on failure."""
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
@@ -238,7 +321,13 @@ def download_dataset_balanced(virus_name="sars-cov-2", output_dir="data", size_g
         print(f"[*] Using local path: {output_path}")
     
     output_path.mkdir(parents=True, exist_ok=True)
-    
+
+    # Verify write permission before attempting downloads
+    if not check_write_permission(output_path):
+        print(f"[!] ERROR: No write permission for output directory: {output_path}")
+        print(f"[!] Please check directory permissions or choose a different output path.")
+        raise PermissionError(f"Cannot write to output directory: {output_path}")
+
     # Check for existing files but continue to check individual accessions
     existing_files = list(output_path.glob("*.zip"))
     existing_accessions = {f.stem for f in existing_files}  # Get accession names without .zip
@@ -486,29 +575,80 @@ def download_dataset_balanced(virus_name="sars-cov-2", output_dir="data", size_g
     
     return str(output_path)
 
+def get_default_output_path():
+    """
+    Detect the best default output path based on the platform.
+    Checks for Google Drive/Colab paths, then falls back to local directory.
+    """
+    import sys
+    import platform
+
+    # Check for Google Colab first
+    if os.path.exists('/content/drive/MyDrive'):
+        return '/content/drive/MyDrive/ncbi_data'
+
+    # Platform-specific Google Drive paths
+    system = platform.system()
+
+    if system == "Windows":
+        # Common Windows Google Drive paths
+        windows_paths = [
+            os.path.expanduser("~/Google Drive/ncbi_data"),
+            "G:/My Drive/ncbi_data",
+            "D:/Google Drive/ncbi_data",
+        ]
+        for path in windows_paths:
+            parent = os.path.dirname(path)
+            if os.path.exists(parent):
+                return path
+    elif system == "Darwin":  # macOS
+        # Common macOS Google Drive paths
+        mac_paths = [
+            os.path.expanduser("~/Library/CloudStorage/GoogleDrive-*/My Drive/ncbi_data"),
+            os.path.expanduser("~/Google Drive/ncbi_data"),
+        ]
+        import glob
+        for pattern in mac_paths:
+            matches = glob.glob(pattern)
+            if matches:
+                return matches[0]
+            # Check if parent exists for non-glob paths
+            if '*' not in pattern:
+                parent = os.path.dirname(pattern)
+                if os.path.exists(parent):
+                    return pattern
+    elif system == "Linux":
+        # Linux Google Drive paths (via google-drive-ocamlfuse or similar)
+        linux_paths = [
+            os.path.expanduser("~/google-drive/ncbi_data"),
+            os.path.expanduser("~/Google Drive/ncbi_data"),
+        ]
+        for path in linux_paths:
+            parent = os.path.dirname(path)
+            if os.path.exists(parent):
+                return path
+
+    # Fallback to local directory
+    return "./ncbi_data"
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Download small SARS-CoV-2 dataset from NCBI")
-    parser.add_argument("--output", type=str, 
-                       default="G:/My Drive/ncbi_data",  # Default to Google Drive
-                       help="Output directory (default: G:/My Drive/ncbi_data)")
+
+    default_output = get_default_output_path()
+    parser.add_argument("--output", type=str,
+                       default=default_output,
+                       help=f"Output directory (default: {default_output})")
     args = parser.parse_args()
-    
-    # Check if output directory exists, if not try common Google Drive paths
+
+    # Ensure output path is valid or use fallback
     if not os.path.exists(args.output):
-        common_paths = [
-            "G:/My Drive/ncbi_data",
-            "C:/Users/zhouf/Google Drive/ncbi_data", 
-            "D:/Google Drive/ncbi_data",
-            "./ncbi_data"  # Fallback to local directory
-        ]
-        
-        for path in common_paths:
-            if os.path.exists(os.path.dirname(path)) or path == "./ncbi_data":
-                args.output = path
-                print(f"[*] Using output directory: {args.output}")
-                break
-        else:
-            print(f"[!] Warning: Could not find Google Drive. Using local directory: ./ncbi_data")
+        parent = os.path.dirname(args.output) if args.output != "./ncbi_data" else "."
+        if parent and not os.path.exists(parent):
+            print(f"[!] Output directory parent does not exist: {parent}")
             args.output = "./ncbi_data"
-    
+            print(f"[*] Using fallback: {args.output}")
+        else:
+            print(f"[*] Output directory will be created: {args.output}")
+
     download_small_subset(args.output)
