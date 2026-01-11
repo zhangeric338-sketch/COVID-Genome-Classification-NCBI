@@ -1,6 +1,7 @@
-import subprocess
 import os
+import subprocess
 import zipfile
+
 
 def download_dataset(virus_name: str = "sars-cov-2", output_dir: str = "data") -> str:
     """
@@ -24,11 +25,7 @@ def download_dataset(virus_name: str = "sars-cov-2", output_dir: str = "data") -
         return extract_path
 
     # Command: datasets download virus genome taxon <virus> --filename <zip>
-    cmd = [
-        "datasets", "download", "virus", "genome",
-        "taxon", virus_name,
-        "--filename", zip_path
-    ]
+    cmd = ["datasets", "download", "virus", "genome", "taxon", virus_name, "--filename", zip_path]
 
     print(f"Running command: {' '.join(cmd)}")
     subprocess.run(cmd, check=True)
@@ -40,4 +37,3 @@ def download_dataset(virus_name: str = "sars-cov-2", output_dir: str = "data") -
 
     print(f"✅ Dataset downloaded and extracted to {extract_path}")
     return extract_path
-
