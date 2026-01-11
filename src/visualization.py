@@ -13,6 +13,48 @@ except ImportError as e:
         "Please install with: pip install matplotlib pandas"
     ) from e
 
+def get_strain_from_accession(accession):
+    """
+    Map a genome accession number to its SARS-CoV-2 strain type.
+
+    This function classifies accessions based on their prefix patterns to identify
+    the variant strain (Reference, Alpha, Beta, Gamma, Delta, Omicron, Recent).
+
+    Args:
+        accession (str): NCBI accession number (e.g., "NC_045512.2", "MT188341.1")
+
+    Returns:
+        str: Strain type (Reference, Alpha, Beta, Gamma, Delta, Omicron, Recent, or Other)
+    """
+    if accession == "NC_045512.2" or accession == "NC_045512.1":
+        return "Reference"
+    elif accession.startswith("MT"):
+        # Check if it's Alpha (188xxx, 326xxx) or Beta (291xxx) or Reference/Early
+        acc_num = accession.split(".")[0]
+        if "188" in acc_num or "326" in acc_num:
+            return "Alpha"
+        elif "291" in acc_num:
+            return "Beta"
+        else:
+            return "Reference"  # Early/Reference variants
+    elif accession.startswith("MW"):
+        # Check if it's Gamma (633477-633496) or Delta (633497+)
+        try:
+            num = int(accession.split(".")[0].replace("MW", ""))
+            if 633477 <= num <= 633496:
+                return "Gamma"
+            else:
+                return "Delta"
+        except ValueError:
+            return "Delta"  # Default to Delta for MW accessions
+    elif accession.startswith("OM"):
+        return "Omicron"
+    elif accession.startswith("ON") or accession.startswith("OP") or accession.startswith("OR"):
+        return "Recent"
+    else:
+        return "Other"
+
+
 def load_metadata(jsonl_path):
     """Load NCBI genome metadata from JSON Lines file into a DataFrame."""
     records = []
@@ -129,39 +171,7 @@ def split_dataset(data_dir, test_ratio=0.2, random_seed=42, balance_variants=Tru
     print(f"[*] Found {len(zip_files)} genome files to split")
     
     if balance_variants:
-        # Define strain mapping based on accession patterns
-        # This matches the structure in download_data.py
-        def get_strain_from_accession(accession):
-            """Map accession to strain type."""
-            if accession == "NC_045512.2" or accession == "NC_045512.1":
-                return "Reference"
-            elif accession.startswith("MT"):
-                # Check if it's Alpha (188xxx, 326xxx) or Beta (291xxx) or Reference/Early
-                acc_num = accession.split(".")[0]
-                if "188" in acc_num or "326" in acc_num:
-                    return "Alpha"
-                elif "291" in acc_num:
-                    return "Beta"
-                else:
-                    return "Reference"  # Early/Reference variants
-            elif accession.startswith("MW"):
-                # Check if it's Gamma (633477-633496) or Delta (633497+)
-                try:
-                    num = int(accession.split(".")[0].replace("MW", ""))
-                    if 633477 <= num <= 633496:
-                        return "Gamma"
-                    else:
-                        return "Delta"
-                except:
-                    return "Delta"  # Default to Delta for MW accessions
-            elif accession.startswith("OM"):
-                return "Omicron"
-            elif accession.startswith("ON") or accession.startswith("OP") or accession.startswith("OR"):
-                return "Recent"
-            else:
-                return "Other"
-        
-        # Group files by strain type
+        # Group files by strain type using module-level get_strain_from_accession
         strain_groups = {}
         for file_path in zip_files:
             accession = file_path.stem  # Remove .zip extension
@@ -306,36 +316,8 @@ def visualize_dataset_composition(data_dir):
     train_files = list(train_dir.glob("*.zip"))
     test_files = list(test_dir.glob("*.zip"))
     
-    # Analyze variant composition
+    # Analyze variant composition using module-level get_strain_from_accession
     def analyze_variants(files):
-        def get_strain_from_accession(accession):
-            """Map accession to strain type."""
-            if accession == "NC_045512.2" or accession == "NC_045512.1":
-                return "Reference"
-            elif accession.startswith("MT"):
-                acc_num = accession.split(".")[0]
-                if "188" in acc_num or "326" in acc_num:
-                    return "Alpha"
-                elif "291" in acc_num:
-                    return "Beta"
-                else:
-                    return "Reference"
-            elif accession.startswith("MW"):
-                try:
-                    num = int(accession.split(".")[0].replace("MW", ""))
-                    if 633477 <= num <= 633496:
-                        return "Gamma"
-                    else:
-                        return "Delta"
-                except:
-                    return "Delta"
-            elif accession.startswith("OM"):
-                return "Omicron"
-            elif accession.startswith("ON") or accession.startswith("OP") or accession.startswith("OR"):
-                return "Recent"
-            else:
-                return "Other"
-        
         variant_counts = {}
         for file_path in files:
             accession = file_path.stem
