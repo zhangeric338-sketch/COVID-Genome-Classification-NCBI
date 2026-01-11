@@ -13,8 +13,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Install Ruff
-        uses: astral-sh/ruff-action@v1
+        run: pip install ruff
 
       - name: Run Ruff linter
         run: ruff check .
@@ -48,6 +53,7 @@ jobs:
           python -m py_compile src/visualization.py
           python -m py_compile src/download.py
           python -m py_compile tools/download_data.py
+          python -m py_compile src/advanced_visualizations.py
 
       - name: Verify imports work
         run: |
