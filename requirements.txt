@@ -3,3 +3,6 @@ click
 requests
 matplotlib
 pandas
+numpy
+seaborn
+biopython
