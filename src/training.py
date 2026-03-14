@@ -7,6 +7,7 @@ Supports:
 - wandb integration for monitoring
 """
 
+import hashlib
 import zipfile
 from collections import Counter
 from pathlib import Path
@@ -146,7 +147,7 @@ def train_random_forest(
 ):
     """Train Random Forest classifier and return fitted model + test accuracy."""
     from sklearn.ensemble import RandomForestClassifier  # type: ignore
-    from sklearn.metrics import accuracy_score, classification_report  # type: ignore
+    from sklearn.metrics import accuracy_score, classification_report, confusion_matrix  # type: ignore
 
     clf = RandomForestClassifier(
         n_estimators=n_estimators,
@@ -154,20 +155,29 @@ def train_random_forest(
         random_state=random_state,
     )
     clf.fit(X_train, y_train)
+    y_train_pred = clf.predict(X_train)
     y_pred = clf.predict(X_test)
+    train_acc = accuracy_score(y_train, y_train_pred)
     acc = accuracy_score(y_test, y_pred)
+    cm = confusion_matrix(y_test, y_pred, labels=sorted(set(y_test)))
 
     if use_wandb:
         _wandb_log({
             "model": "random_forest",
-            "test_accuracy": acc,
+            "train/accuracy": train_acc,
+            "test/accuracy": acc,
+            "test_accuracy": acc,  # backward-compatible key
             "train_samples": len(y_train),
             "test_samples": len(y_test),
         })
 
     print("\n[✓] Random Forest training complete")
-    print(f"  Test accuracy: {acc:.4f}")
+    print(f"  Train accuracy: {train_acc:.4f}")
+    print(f"  Test  accuracy: {acc:.4f}")
+    print("\n[Classification report (test set)]")
     print(classification_report(y_test, y_pred))
+    print("Confusion matrix (rows=true, cols=pred, test set):")
+    print(cm)
     return clf, acc
 
 
@@ -183,7 +193,7 @@ def train_mlp(
     use_wandb: bool = True,
 ):
     """Train MLP classifier (sklearn) and return fitted model + test accuracy."""
-    from sklearn.metrics import accuracy_score, classification_report  # type: ignore
+    from sklearn.metrics import accuracy_score, classification_report, confusion_matrix  # type: ignore
     from sklearn.neural_network import MLPClassifier  # type: ignore
 
     y_train_int = [label_encoder[l] for l in y_train]
@@ -207,21 +217,30 @@ def train_mlp(
                 log_data["val/accuracy"] = clf.validation_scores_[step]
             _wandb_log(log_data, step=step)
 
+    y_train_pred_int = clf.predict(X_train)
     y_pred_int = clf.predict(X_test)
     y_pred = [inv_encoder[v] for v in y_pred_int]
+    train_acc = accuracy_score(y_train_int, y_train_pred_int)
     acc = accuracy_score(y_test_int, y_pred_int)
+    cm = confusion_matrix(y_test_int, y_pred_int, labels=sorted(set(y_test_int)))
 
     if use_wandb:
         _wandb_log({
             "model": "mlp",
-            "test_accuracy": acc,
+            "train/accuracy": train_acc,
+            "test/accuracy": acc,
+            "test_accuracy": acc,  # backward-compatible key
             "train_samples": len(y_train),
             "test_samples": len(y_test),
         })
 
     print("\n[✓] MLP training complete")
-    print(f"  Test accuracy: {acc:.4f}")
+    print(f"  Train accuracy: {train_acc:.4f}")
+    print(f"  Test  accuracy: {acc:.4f}")
+    print("\n[Classification report (test set)]")
     print(classification_report(y_test, y_pred))
+    print("Confusion matrix (rows=true, cols=pred, test set):")
+    print(cm)
     return clf, acc
 
 
@@ -248,6 +267,45 @@ def run_training(
     print(f"  Train: {len(train_genomes)} genomes, Test: {len(test_genomes)} genomes")
     print(f"  Strains: {sorted(all_labels)}")
 
+    # Dataset provenance: accession lists and a stable hash so we know
+    # exactly which genomes were used for this training run.
+    train_accessions = sorted(g["accession"] for g in train_genomes)
+    test_accessions = sorted(g["accession"] for g in test_genomes)
+    provenance_payload = {
+        "train": train_accessions,
+        "test": test_accessions,
+    }
+    provenance_bytes = str(provenance_payload).encode("utf-8")
+    dataset_hash = hashlib.sha256(provenance_bytes).hexdigest()
+
+    print(f"  Dataset hash (train/test accessions): {dataset_hash}")
+
+    # Simple leakage check: identical sequences appearing in both train and test.
+    def _seq_hash(seq: str) -> str:
+        return hashlib.sha256(seq.encode("utf-8")).hexdigest()
+
+    train_seq_hashes = { _seq_hash(g["sequence"]) for g in train_genomes }
+    test_seq_hashes = { _seq_hash(g["sequence"]) for g in test_genomes }
+    overlap_hashes = train_seq_hashes & test_seq_hashes
+
+    if overlap_hashes:
+        overlap_count = len(overlap_hashes)
+        print(
+            f"[!] WARNING: Detected {overlap_count} identical genome sequence(s) "
+            "present in BOTH train and test sets (potential leakage)."
+        )
+        # Optionally list a few example accessions involved in leakage
+        example_hash = next(iter(overlap_hashes))
+        train_example = next(
+            g["accession"] for g in train_genomes if _seq_hash(g["sequence"]) == example_hash
+        )
+        test_example = next(
+            g["accession"] for g in test_genomes if _seq_hash(g["sequence"]) == example_hash
+        )
+        print(f"    Example overlapping accessions (train, test): {train_example}, {test_example}")
+    else:
+        print("[*] No identical genome sequences detected across train and test (no direct leakage).")
+
     # Build k-mer features
     print(f"\n[*] Extracting {k}-mers and building feature matrix...")
     X_train, y_train, kmer_vocab = build_kmer_matrix(train_genomes, k=k)
@@ -269,6 +327,7 @@ def run_training(
                     "train_samples": len(train_genomes),
                     "test_samples": len(test_genomes),
                     "kmer_vocab_size": len(kmer_vocab),
+                    "dataset_hash": dataset_hash,
                     **kwargs,
                 })
         except Exception:
