@@ -2,6 +2,7 @@ import argparse
 import os
 from pathlib import Path
 
+from src.training import run_training
 from src.visualization import (
     split_dataset,
     visualize_dataset,
@@ -95,6 +96,24 @@ def main():
         action="store_true",
         help="Query NCBI for total count and estimated size of all available genomes (human host, complete-only)",
     )
+    parser.add_argument(
+        "--train",
+        action="store_true",
+        help="Run strain classification training after data pipeline (k-mer + Random Forest or MLP)",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="random_forest",
+        choices=["random_forest", "mlp"],
+        help="Model for training: random_forest or mlp (default: random_forest)",
+    )
+    parser.add_argument(
+        "--kmer-size",
+        type=int,
+        default=6,
+        help="k-mer size for sequence features (default: 6)",
+    )
 
     args = parser.parse_args()
 
@@ -174,6 +193,18 @@ def main():
         _wandb_log_image("split/dataset_composition", "dataset_composition.png")
     finally:
         _wandb_finish()
+
+    # Optional training
+    if args.train:
+        print("\n" + "=" * 60)
+        print("Training strain classification model")
+        print("=" * 60)
+        run_training(
+            data_dir=dataset_path,
+            model=args.model,
+            k=args.kmer_size,
+            use_wandb=True,
+        )
 
 
 if __name__ == "__main__":

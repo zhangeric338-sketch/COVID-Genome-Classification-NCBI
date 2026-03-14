@@ -6,4 +6,5 @@ pandas
 numpy
 seaborn
 biopython
+scikit-learn
 wandb
