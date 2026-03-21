@@ -7,15 +7,19 @@ Supports:
 - wandb integration for monitoring
 """
 
-import hashlib
-import zipfile
 from collections import Counter
+import hashlib
 from pathlib import Path
+import zipfile
 
 from Bio import SeqIO  # type: ignore[import-untyped]
 from Bio.Seq import Seq  # type: ignore[import-untyped]
 
-from src.visualization import get_strain_from_accession
+try:
+    from src.visualization import get_strain_from_accession
+except ModuleNotFoundError:
+    # Support running as a direct script: python src/training.py
+    from visualization import get_strain_from_accession
 
 # Optional wandb - no-op if unavailable
 def _wandb_log(data, step=None):
@@ -132,7 +136,7 @@ def load_genome_dataset(data_dir: str | Path, k: int = 6) -> tuple[list[dict], l
 
     train_genomes = load_from_dir(train_dir) if train_dir.exists() else []
     test_genomes = load_from_dir(test_dir) if test_dir.exists() else []
-    return train_genomes, test_genomes, list(set(g["label"] for g in train_genomes + test_genomes))
+    return train_genomes, test_genomes, list({genome["label"] for genome in train_genomes + test_genomes})
 
 
 def train_random_forest(
@@ -196,8 +200,8 @@ def train_mlp(
     from sklearn.metrics import accuracy_score, classification_report, confusion_matrix  # type: ignore
     from sklearn.neural_network import MLPClassifier  # type: ignore
 
-    y_train_int = [label_encoder[l] for l in y_train]
-    y_test_int = [label_encoder[l] for l in y_test]
+    y_train_int = [label_encoder[label] for label in y_train]
+    y_test_int = [label_encoder[label] for label in y_test]
 
     clf = MLPClassifier(
         hidden_layer_sizes=hidden_layer_sizes,
@@ -315,7 +319,7 @@ def run_training(
     print(f"  Train X: {len(X_train)} samples, Test X: {len(X_test)} samples")
 
     # Label encoding for MLP
-    label_encoder = {l: i for i, l in enumerate(sorted(all_labels))}
+    label_encoder = {label: idx for idx, label in enumerate(sorted(all_labels))}
 
     if use_wandb:
         try:
