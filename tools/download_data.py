@@ -15,6 +15,7 @@ import os
 import random
 import shutil
 import subprocess
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -112,6 +113,13 @@ def run_cmd(cmd):
     if result.returncode != 0:
         raise RuntimeError(f"Command failed: {cmd}\n{result.stderr}")
     return result.stdout
+
+
+def sleep_with_backoff(attempt, base_seconds=1.0, max_seconds=20.0):
+    """Sleep with capped exponential backoff and small jitter."""
+    delay = min(max_seconds, base_seconds * (2 ** (attempt - 1)))
+    jitter = random.uniform(0.0, 0.25 * delay)
+    time.sleep(delay + jitter)
 
 
 def download_genome_via_api(accession, output_path):
@@ -254,35 +262,45 @@ def download_small_subset(output_dir):
 def download_single_genome(accession, output_path):
     """Download a single genome accession."""
     print(f"Downloading {accession}...")
+    max_attempts = 3
 
-    # Check if CLI is available
-    if check_cli_available():
-        # Use CLI method
-        cmd = (
-            f"datasets download virus genome accession {accession} "
-            f"--include genome,annotation "
-            f"--host human --complete-only "
-            f"--filename {output_path}/{accession}.zip --no-progressbar"
-        )
+    for attempt in range(1, max_attempts + 1):
+        if attempt > 1:
+            print(f"    Retry {attempt}/{max_attempts} for {accession}...")
+            sleep_with_backoff(attempt)
+
+        # Check if CLI is available
+        if check_cli_available():
+            # Use CLI method
+            cmd = (
+                f"datasets download virus genome accession {accession} "
+                f"--include genome,annotation "
+                f"--host human --complete-only "
+                f"--filename {output_path}/{accession}.zip --no-progressbar"
+            )
+            try:
+                run_cmd(cmd)
+                print(f"    ✓ Downloaded {accession}")
+                return accession, True
+            except RuntimeError as e:
+                print(f"    ✗ Failed to download {accession} via CLI: {e}")
+                print("    Trying API fallback...")
+                # Fall through to API method
+        else:
+            print("    CLI not available, using API...")
+
+        # Use API method (fallback or primary if CLI unavailable)
         try:
-            run_cmd(cmd)
+            download_genome_via_api(accession, output_path)
             print(f"    ✓ Downloaded {accession}")
             return accession, True
         except RuntimeError as e:
-            print(f"    ✗ Failed to download {accession} via CLI: {e}")
-            print("    Trying API fallback...")
-            # Fall through to API method
-    else:
-        print("    CLI not available, using API...")
+            if attempt == max_attempts:
+                print(f"    ✗ Failed to download {accession} after {max_attempts} attempts: {e}")
+                return accession, False
+            print(f"    ✗ Failed to download {accession}: {e}")
 
-    # Use API method (fallback or primary if CLI unavailable)
-    try:
-        download_genome_via_api(accession, output_path)
-        print(f"    ✓ Downloaded {accession}")
-        return accession, True
-    except RuntimeError as e:
-        print(f"    ✗ Failed to download {accession}: {e}")
-        return accession, False
+    return accession, False
 
 
 def download_dataset_balanced(virus_name="sars-cov-2", output_dir="data", size_gb=0.05, seed=42, workers=4):
@@ -527,6 +545,9 @@ def download_dataset_balanced(virus_name="sars-cov-2", output_dir="data", size_g
             selected_accessions = accessions
             print(f"[*] Partial dataset mode: using all {len(accessions)} accessions (less than target)")
 
+    # Keep deterministic ordering for consistent behavior and logging across runs
+    selected_accessions = sorted(selected_accessions)
+
     # Filter out already downloaded accessions
     accessions_to_download = [acc for acc in selected_accessions if acc not in existing_accessions]
     already_downloaded = [acc for acc in selected_accessions if acc in existing_accessions]
@@ -569,11 +590,14 @@ def download_dataset_balanced(virus_name="sars-cov-2", output_dir="data", size_g
     successful = sum(1 for _, success in results if success)
     failed = len(results) - successful
     total_files = len(existing_accessions) + successful
+    failed_accessions = sorted([accession for accession, success in results if not success])
 
     print("[✓] Download complete:")
     print(f"  - Already had: {len(already_downloaded)} files")
     print(f"  - Newly downloaded: {successful} successful, {failed} failed")
     print(f"  - Total files now: {total_files}")
+    if failed_accessions:
+        print(f"  - Failed accessions: {failed_accessions}")
     print(f"[*] Files saved to: {output_path}")
 
     return str(output_path)
