@@ -43,16 +43,16 @@ def query_ncbi_genome_count(virus_name="sars-cov-2", host="human", complete_only
     """
     try:
         # Use NCBI Datasets API to get summary
-        api_url = f"https://api.ncbi.nlm.nih.gov/datasets/v2alpha/virus/taxon/{virus_name}/genome/summary"
+        api_url = "https://api.ncbi.nlm.nih.gov/datasets/v2/virus/genome"
 
-        params = {"host": host}
+        body = {"taxon": virus_name, "host": host}
         if complete_only:
-            params["complete_only"] = "true"
+            body["complete_only"] = True
 
-        query_string = urllib.parse.urlencode(params)
-        full_url = f"{api_url}?{query_string}"
-
-        req = urllib.request.Request(full_url, headers={"Accept": "application/json"})
+        payload_json = json.dumps(body).encode("utf-8")
+        req = urllib.request.Request(
+            api_url, data=payload_json, headers={"Content-Type": "application/json", "Accept": "application/json"}
+        )
 
         print(f"[*] Querying NCBI for {virus_name} genome count...")
 
@@ -60,7 +60,7 @@ def query_ncbi_genome_count(virus_name="sars-cov-2", host="human", complete_only
             data = json.loads(response.read().decode("utf-8"))
 
             # Extract count from response
-            total_count = data.get("total_count", 0)
+            total_count = data.get("record_count", 0)
 
             # Estimate size based on ~6MB per genome
             estimated_size_mb = total_count * 6
@@ -126,12 +126,12 @@ def download_genome_via_api(accession, output_path):
     """Download a genome using NCBI Datasets API (fallback when CLI is not available)."""
     try:
         # Use NCBI Datasets API v2 - POST request with JSON payload
-        api_url = "https://api.ncbi.nlm.nih.gov/datasets/v2alpha/virus/genome/download"
+        api_url = "https://api.ncbi.nlm.nih.gov/datasets/v2/virus/genome/download"
 
         # Request payload
         payload = {
             "accessions": [accession],
-            "include_annotation_type": ["GENOME_FASTA", "GENOME_GFF", "CDS_FASTA", "PROT_FASTA"],
+            "include_sequence": ["GENOME_FASTA", "CDS_FASTA", "PROT_FASTA"],
             "host": "human",
             "complete_only": True,
         }
@@ -233,8 +233,8 @@ def download_small_subset(output_dir):
         if use_cli:
             cmd = (
                 f"datasets download virus genome accession {accession} "
-                f"--include genome,annotation_report "
-                f"--host human --assembly-level complete "
+                f"--include genome,annotation "
+                f"--host human --complete-only "
                 f"--filename {output_path}/{accession}.zip --no-progressbar"
             )
             try:
