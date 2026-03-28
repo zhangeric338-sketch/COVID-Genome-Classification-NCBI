@@ -233,7 +233,7 @@ def download_small_subset(output_dir):
         if use_cli:
             cmd = (
                 f"datasets download virus genome accession {accession} "
-                f"--include genome,annotation "
+                f"--include genome,cds,protein "
                 f"--host human --complete-only "
                 f"--filename {output_path}/{accession}.zip --no-progressbar"
             )
@@ -274,7 +274,7 @@ def download_single_genome(accession, output_path):
             # Use CLI method
             cmd = (
                 f"datasets download virus genome accession {accession} "
-                f"--include genome,annotation "
+                f"--include genome,cds,protein "
                 f"--host human --complete-only "
                 f"--filename {output_path}/{accession}.zip --no-progressbar"
             )
