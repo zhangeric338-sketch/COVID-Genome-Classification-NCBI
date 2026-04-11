@@ -43,16 +43,16 @@ def query_ncbi_genome_count(virus_name="sars-cov-2", host="human", complete_only
     """
     try:
         # Use NCBI Datasets API to get summary
-        api_url = f"https://api.ncbi.nlm.nih.gov/datasets/v2alpha/virus/taxon/{virus_name}/genome/summary"
+        api_url = "https://api.ncbi.nlm.nih.gov/datasets/v2/virus/genome"
 
-        params = {"host": host}
+        body = {"taxon": virus_name, "host": host}
         if complete_only:
-            params["complete_only"] = "true"
+            body["complete_only"] = True
 
-        query_string = urllib.parse.urlencode(params)
-        full_url = f"{api_url}?{query_string}"
-
-        req = urllib.request.Request(full_url, headers={"Accept": "application/json"})
+        payload_json = json.dumps(body).encode("utf-8")
+        req = urllib.request.Request(
+            api_url, data=payload_json, headers={"Content-Type": "application/json", "Accept": "application/json"}
+        )
 
         print(f"[*] Querying NCBI for {virus_name} genome count...")
 
@@ -60,7 +60,7 @@ def query_ncbi_genome_count(virus_name="sars-cov-2", host="human", complete_only
             data = json.loads(response.read().decode("utf-8"))
 
             # Extract count from response
-            total_count = data.get("total_count", 0)
+            total_count = data.get("record_count", 0)
 
             # Estimate size based on ~6MB per genome
             estimated_size_mb = total_count * 6
@@ -126,12 +126,12 @@ def download_genome_via_api(accession, output_path):
     """Download a genome using NCBI Datasets API (fallback when CLI is not available)."""
     try:
         # Use NCBI Datasets API v2 - POST request with JSON payload
-        api_url = "https://api.ncbi.nlm.nih.gov/datasets/v2alpha/virus/genome/download"
+        api_url = "https://api.ncbi.nlm.nih.gov/datasets/v2/virus/genome/download"
 
         # Request payload
         payload = {
             "accessions": [accession],
-            "include_annotation_type": ["GENOME_FASTA", "GENOME_GFF", "CDS_FASTA", "PROT_FASTA"],
+            "include_sequence": ["GENOME_FASTA", "CDS_FASTA", "PROT_FASTA"],
             "host": "human",
             "complete_only": True,
         }
@@ -207,13 +207,13 @@ def download_small_subset(output_dir):
     # These are well-known complete genomes that should total around 50MB
     accessions = [
         "NC_045512.2",  # Reference genome (Wuhan-Hu-1)
-        "MT123290.1",  # Early variant
-        "MT188341.1",  # Alpha variant example
-        "MW633477.1",  # Delta variant example
-        "OM095411.1",  # Omicron variant example
-        "ON563414.1",  # Recent variant
-        "OP912844.1",  # Recent variant
-        "OR064389.1",  # Recent variant
+        "MT123290.1",  # Early Wuhan-like variant
+        "OQ898928.1",  # Alpha (B.1.1.7) variant
+        "OR353131.1",  # Beta (B.1.351) variant
+        "MW642250.1",  # Gamma (P.1) variant
+        "OR323381.1",  # Delta (B.1.617.2) variant
+        "OM095411.1",  # Omicron (B.1.1.529) variant
+        "PP832909.1",  # Recent (JN.1) variant
     ]
 
     print(f"[*] Downloading {len(accessions)} SARS-CoV-2 genomes to {output_path}")
@@ -233,8 +233,8 @@ def download_small_subset(output_dir):
         if use_cli:
             cmd = (
                 f"datasets download virus genome accession {accession} "
-                f"--include genome,annotation_report "
-                f"--host human --assembly-level complete "
+                f"--include genome,cds,protein "
+                f"--host human --complete-only "
                 f"--filename {output_path}/{accession}.zip --no-progressbar"
             )
             try:
@@ -274,7 +274,7 @@ def download_single_genome(accession, output_path):
             # Use CLI method
             cmd = (
                 f"datasets download virus genome accession {accession} "
-                f"--include genome,annotation "
+                f"--include genome,cds,protein "
                 f"--host human --complete-only "
                 f"--filename {output_path}/{accession}.zip --no-progressbar"
             )
@@ -361,161 +361,167 @@ def download_dataset_balanced(virus_name="sars-cov-2", output_dir="data", size_g
     print(f"[*] Using pre-selected {virus_name} accessions for faster download...")
     # Use only proven, working SARS-CoV-2 accessions
     # Organized by strain with exactly 20 accessions per strain for balanced datasets
-    # These are accessions that have been successfully downloaded before
+    # All accessions verified via NCBI esearch + efetch + GenBank spot-checks
     accessions_by_strain = {
         "Reference": [
             "NC_045512.2",  # Reference genome (Wuhan-Hu-1) - PROVEN
             "NC_045512.1",  # Reference genome (older version)
-            "MT066156.1",  # Early reference-like
-            "MT066157.1",  # Early reference-like
-            "MT066158.1",  # Early reference-like
-            "MT072688.1",  # Early reference-like
-            "MT072689.1",  # Early reference-like
-            "MT072690.1",  # Early reference-like
-            "MT093571.1",  # Early reference-like
-            "MT093572.1",  # Early reference-like
-            "MT106052.1",  # Early reference-like
-            "MT106053.1",  # Early reference-like
-            "MT123290.1",  # Early variant - PROVEN
-            "MT123291.1",  # Early variant - PROVEN
-            "MT123292.1",  # Early variant - PROVEN
-            "MT123293.1",  # Early variant - PROVEN
-            "MT123294.1",  # Early variant
-            "MT123295.1",  # Early variant
-            "MT123296.1",  # Early variant
-            "MT123297.1",  # Early variant
+            "MT066156.1",  # Early Wuhan-like
+            "MT066157.1",  # Early Wuhan-like
+            "MT066158.1",  # Early Wuhan-like
+            "MT072688.1",  # Early Wuhan-like
+            "MT072689.1",  # Early Wuhan-like
+            "MT072690.1",  # Early Wuhan-like
+            "MT093571.1",  # Early Wuhan-like
+            "MT093572.1",  # Early Wuhan-like
+            "MT106052.1",  # Early Wuhan-like
+            "MT106053.1",  # Early Wuhan-like
+            "MT123290.1",  # Early Wuhan-like - PROVEN
+            "MT123291.1",  # Early Wuhan-like - PROVEN
+            "MT123292.1",  # Early Wuhan-like - PROVEN
+            "MT123293.1",  # Early Wuhan-like - PROVEN
+            "MT123294.1",  # Early Wuhan-like
+            "MT123295.1",  # Early Wuhan-like
+            "MT123296.1",  # Early Wuhan-like
+            "MT123297.1",  # Early Wuhan-like
         ],
         "Alpha": [
-            "MT188341.1",  # Alpha variant - PROVEN
-            "MT188342.1",  # Alpha variant - PROVEN
-            "MT188343.1",  # Alpha variant - PROVEN
-            "MT188344.1",  # Alpha variant
-            "MT188345.1",  # Alpha variant
-            "MT188346.1",  # Alpha variant
-            "MT326110.1",  # Alpha variant
-            "MT326111.1",  # Alpha variant
-            "MT326112.1",  # Alpha variant
-            "MT326113.1",  # Alpha variant
-            "MT326114.1",  # Alpha variant
-            "MT326115.1",  # Alpha variant
-            "MT326116.1",  # Alpha variant
-            "MT326117.1",  # Alpha variant
-            "MT326118.1",  # Alpha variant
-            "MT326119.1",  # Alpha variant
-            "MT326120.1",  # Alpha variant
-            "MT326121.1",  # Alpha variant
-            "MT326122.1",  # Alpha variant
-            "MT326123.1",  # Alpha variant
+            # Alpha (B.1.1.7) variant - verified via NCBI esearch + GenBank genotype annotations
+            "OQ898928.1",  # Alpha (B.1.1.7) - France 2021, genotype: B.1.1.7
+            "MZ305033.1",  # Alpha (B.1.1.7) - B.1.1.7 tiger infection study
+            "MZ305032.1",  # Alpha (B.1.1.7)
+            "MZ305031.1",  # Alpha (B.1.1.7)
+            "OV054768.1",  # Alpha (B.1.1.7)
+            "OL580734.1",  # Alpha (B.1.1.7)
+            "OL461702.1",  # Alpha (B.1.1.7)
+            "OL461700.1",  # Alpha (B.1.1.7)
+            "OL461699.1",  # Alpha (B.1.1.7)
+            "OL461696.1",  # Alpha (B.1.1.7)
+            "OL461695.1",  # Alpha (B.1.1.7)
+            "OL461694.1",  # Alpha (B.1.1.7)
+            "OL461693.1",  # Alpha (B.1.1.7)
+            "OL461692.1",  # Alpha (B.1.1.7)
+            "OL461691.1",  # Alpha (B.1.1.7)
+            "OL461690.1",  # Alpha (B.1.1.7)
+            "OL461689.1",  # Alpha (B.1.1.7)
+            "OL461688.1",  # Alpha (B.1.1.7)
+            "OL461687.1",  # Alpha (B.1.1.7)
+            "OL461686.1",  # Alpha (B.1.1.7)
         ],
         "Beta": [
-            "MT291826.1",  # Beta variant - PROVEN
-            "MT291827.1",  # Beta variant - PROVEN
-            "MT291828.1",  # Beta variant - PROVEN
-            "MT291829.1",  # Beta variant - PROVEN
-            "MT291830.1",  # Beta variant
-            "MT291831.1",  # Beta variant
-            "MT291832.1",  # Beta variant
-            "MT291833.1",  # Beta variant
-            "MT291834.1",  # Beta variant
-            "MT291835.1",  # Beta variant
-            "MT291836.1",  # Beta variant
-            "MT291837.1",  # Beta variant
-            "MT291838.1",  # Beta variant
-            "MT291839.1",  # Beta variant
-            "MT291840.1",  # Beta variant
-            "MT291841.1",  # Beta variant
-            "MT291842.1",  # Beta variant
-            "MT291843.1",  # Beta variant
-            "MT291844.1",  # Beta variant
-            "MT291845.1",  # Beta variant
+            # Beta (B.1.351) variant - verified via NCBI esearch + GenBank genotype annotations
+            "OR353131.1",  # Beta (B.1.351.2) - France 2021, genotype: B.1.351.2
+            "OR322476.1",  # Beta (B.1.351)
+            "OR322467.1",  # Beta (B.1.351)
+            "OR278055.1",  # Beta (B.1.351)
+            "OR274549.1",  # Beta (B.1.351)
+            "OR274547.1",  # Beta (B.1.351)
+            "OQ900811.1",  # Beta (B.1.351)
+            "OQ899960.1",  # Beta (B.1.351)
+            "OQ897488.1",  # Beta (B.1.351)
+            "OQ896567.1",  # Beta (B.1.351)
+            "MZ433432.1",  # Beta (B.1.351)
+            "MZ427312.1",  # Beta (B.1.351)
+            "MZ314997.2",  # Beta (B.1.351)
+            "MZ314996.2",  # Beta (B.1.351)
+            "MZ314998.1",  # Beta (B.1.351)
+            "MZ068161.1",  # Beta (B.1.351)
+            "MZ068160.1",  # Beta (B.1.351)
+            "MZ068159.1",  # Beta (B.1.351)
+            "MZ068158.1",  # Beta (B.1.351)
+            "MZ068157.1",  # Beta (B.1.351)
         ],
         "Gamma": [
-            "MW633477.1",  # Gamma variant
-            "MW633478.1",  # Gamma variant
-            "MW633479.1",  # Gamma variant
-            "MW633480.1",  # Gamma variant
-            "MW633481.1",  # Gamma variant
-            "MW633482.1",  # Gamma variant
-            "MW633483.1",  # Gamma variant
-            "MW633484.1",  # Gamma variant
-            "MW633485.1",  # Gamma variant
-            "MW633486.1",  # Gamma variant
-            "MW633487.1",  # Gamma variant
-            "MW633488.1",  # Gamma variant
-            "MW633489.1",  # Gamma variant
-            "MW633490.1",  # Gamma variant
-            "MW633491.1",  # Gamma variant
-            "MW633492.1",  # Gamma variant
-            "MW633493.1",  # Gamma variant
-            "MW633494.1",  # Gamma variant
-            "MW633495.1",  # Gamma variant
-            "MW633496.1",  # Gamma variant
+            # Gamma (P.1) variant - verified via NCBI esearch + GenBank title/annotations
+            "MW642250.1",  # Gamma (P.1) - Italy 2021, "P.1 Strains" paper
+            "MW642249.1",  # Gamma (P.1)
+            "MW642248.1",  # Gamma (P.1)
+            "OR701610.1",  # Gamma (P.1)
+            "OR322710.1",  # Gamma (P.1)
+            "OR322709.1",  # Gamma (P.1)
+            "OR322707.1",  # Gamma (P.1)
+            "OR322706.1",  # Gamma (P.1)
+            "OR279393.1",  # Gamma (P.1)
+            "OR279057.1",  # Gamma (P.1)
+            "OR273956.1",  # Gamma (P.1)
+            "OQ907679.1",  # Gamma (P.1)
+            "OQ907601.1",  # Gamma (P.1)
+            "OQ905774.1",  # Gamma (P.1)
+            "OQ905694.1",  # Gamma (P.1)
+            "OQ903601.1",  # Gamma (P.1)
+            "OQ903451.1",  # Gamma (P.1)
+            "OQ903133.1",  # Gamma (P.1)
+            "OQ902994.1",  # Gamma (P.1)
+            "OQ900766.1",  # Gamma (P.1)
         ],
         "Delta": [
-            "MW633497.1",  # Delta variant
-            "MW633498.1",  # Delta variant
-            "MW633499.1",  # Delta variant
-            "MW633500.1",  # Delta variant
-            "MW633501.1",  # Delta variant
-            "MW633502.1",  # Delta variant
-            "MW633503.1",  # Delta variant
-            "MW633504.1",  # Delta variant
-            "MW633505.1",  # Delta variant
-            "MW633506.1",  # Delta variant
-            "MW633507.1",  # Delta variant
-            "MW633508.1",  # Delta variant
-            "MW633509.1",  # Delta variant
-            "MW633510.1",  # Delta variant
-            "MW633511.1",  # Delta variant
-            "MW633512.1",  # Delta variant
-            "MW633513.1",  # Delta variant
-            "MW633514.1",  # Delta variant
-            "MW633515.1",  # Delta variant
-            "MW633516.1",  # Delta variant
+            # Delta (B.1.617.2) variant - verified via NCBI esearch + GenBank genotype annotations
+            "OR323381.1",  # Delta (B.1.617.2) - human, genotype: B.1.617.2
+            "OR323348.1",  # Delta (B.1.617.2)
+            "OR323317.1",  # Delta (B.1.617.2)
+            "OR323300.1",  # Delta (B.1.617.2)
+            "OR323282.1",  # Delta (B.1.617.2)
+            "OR323281.1",  # Delta (B.1.617.2)
+            "OR323276.1",  # Delta (B.1.617.2)
+            "OR323275.1",  # Delta (B.1.617.2)
+            "OR323273.1",  # Delta (B.1.617.2)
+            "OR323213.1",  # Delta (B.1.617.2)
+            "OR323144.1",  # Delta (B.1.617.2)
+            "OR323039.1",  # Delta (B.1.617.2)
+            "OR322908.1",  # Delta (B.1.617.2)
+            "OR322800.1",  # Delta (B.1.617.2)
+            "OR322776.1",  # Delta (B.1.617.2)
+            "OR322732.1",  # Delta (B.1.617.2)
+            "OR322731.1",  # Delta (B.1.617.2)
+            "OR322714.1",  # Delta (B.1.617.2)
+            "OR282403.1",  # Delta (B.1.617.2)
+            "OR281251.1",  # Delta (B.1.617.2)
         ],
         "Omicron": [
-            "OM095411.1",  # Omicron variant - PROVEN
-            "OM095412.1",  # Omicron variant - PROVEN
-            "OM095413.1",  # Omicron variant - PROVEN
-            "OM095414.1",  # Omicron variant
-            "OM095415.1",  # Omicron variant
-            "OM095416.1",  # Omicron variant
-            "OM095417.1",  # Omicron variant
-            "OM095418.1",  # Omicron variant
-            "OM095419.1",  # Omicron variant
-            "OM095420.1",  # Omicron variant
-            "OM095421.1",  # Omicron variant
-            "OM095422.1",  # Omicron variant
-            "OM095423.1",  # Omicron variant
-            "OM095424.1",  # Omicron variant
-            "OM095425.1",  # Omicron variant
-            "OM095426.1",  # Omicron variant
-            "OM095427.1",  # Omicron variant
-            "OM095428.1",  # Omicron variant
-            "OM095429.1",  # Omicron variant
-            "OM095430.1",  # Omicron variant
+            # Omicron (B.1.1.529) variant - verified via NCBI esearch + "Sublineage B.1.1.529 Omicron" paper
+            "OQ905474.1",  # Omicron (B.1.1.529) - France 2022
+            "OM570283.1",  # Omicron (B.1.1.529) - "25 SARS-CoV-2 Sublineage B.1.1.529" paper
+            "OM570282.1",  # Omicron (B.1.1.529)
+            "OM570281.1",  # Omicron (B.1.1.529)
+            "OM570280.1",  # Omicron (B.1.1.529)
+            "OM570279.1",  # Omicron (B.1.1.529)
+            "OM570278.1",  # Omicron (B.1.1.529)
+            "OM570277.1",  # Omicron (B.1.1.529)
+            "OM570276.1",  # Omicron (B.1.1.529)
+            "OM570275.1",  # Omicron (B.1.1.529)
+            "OM570274.1",  # Omicron (B.1.1.529)
+            "OM570273.1",  # Omicron (B.1.1.529)
+            "OM570272.1",  # Omicron (B.1.1.529)
+            "OM570271.1",  # Omicron (B.1.1.529)
+            "OM570270.1",  # Omicron (B.1.1.529)
+            "OM570269.1",  # Omicron (B.1.1.529)
+            "OM570268.1",  # Omicron (B.1.1.529)
+            "OM570267.1",  # Omicron (B.1.1.529)
+            "OM570266.1",  # Omicron (B.1.1.529)
+            "OM570265.1",  # Omicron (B.1.1.529)
         ],
         "Recent": [
-            "ON563414.1",  # Recent variant (from small subset)
-            "ON563415.1",  # Recent variant
-            "ON563416.1",  # Recent variant
-            "ON563417.1",  # Recent variant
-            "ON563418.1",  # Recent variant
-            "ON563419.1",  # Recent variant
-            "ON563420.1",  # Recent variant
-            "ON563421.1",  # Recent variant
-            "ON563422.1",  # Recent variant
-            "ON563423.1",  # Recent variant
-            "OP912844.1",  # Recent variant - PROVEN
-            "OP912845.1",  # Recent variant - PROVEN
-            "OP912846.1",  # Recent variant - PROVEN
-            "OP912847.1",  # Recent variant
-            "OP912848.1",  # Recent variant
-            "OP912849.1",  # Recent variant
-            "OP912850.1",  # Recent variant
-            "OP912851.1",  # Recent variant
-            "OP912852.1",  # Recent variant
-            "OP912853.1",  # Recent variant
+            # Recent (JN.1) variant - verified via NCBI esearch + GenBank "JN.1" title annotations
+            "PP832909.1",  # Recent (JN.1) - Morocco 2024, "First Report of SARS-CoV-2 JN.1"
+            "PP832907.1",  # Recent (JN.1)
+            "PP357841.1",  # Recent (JN.1) - France 2024, ICU study
+            "PP357840.1",  # Recent (JN.1)
+            "PP357816.1",  # Recent (JN.1)
+            "PP357814.1",  # Recent (JN.1)
+            "PP357812.1",  # Recent (JN.1)
+            "PP357805.1",  # Recent (JN.1)
+            "PP357803.1",  # Recent (JN.1)
+            "PP357797.1",  # Recent (JN.1)
+            "PP357786.1",  # Recent (JN.1)
+            "PP357785.1",  # Recent (JN.1)
+            "PP357778.1",  # Recent (JN.1)
+            "PP357768.1",  # Recent (JN.1)
+            "PP357764.1",  # Recent (JN.1)
+            "PP357762.1",  # Recent (JN.1)
+            "PP357759.1",  # Recent (JN.1)
+            "PP357753.1",  # Recent (JN.1)
+            "PP357734.1",  # Recent (JN.1)
+            "PP357732.1",  # Recent (JN.1)
         ],
     }
 
