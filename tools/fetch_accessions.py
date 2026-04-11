@@ -17,7 +17,6 @@ from pathlib import Path
 
 from Bio import Entrez
 
-
 # Strain definitions: name -> list of Entrez search terms for Pango lineages
 # Each strain may have multiple lineage patterns to search for
 STRAIN_QUERIES = {
@@ -28,28 +27,22 @@ STRAIN_QUERIES = {
         ' AND 2020/01/01:2020/03/31[Collection Date] AND "A"[Lineage]',
     ],
     "Alpha": [
-        'txid2697049[Organism] AND "complete genome"[Title] AND "Homo sapiens"[Host]'
-        ' AND "B.1.1.7"[All Fields]',
+        'txid2697049[Organism] AND "complete genome"[Title] AND "Homo sapiens"[Host] AND "B.1.1.7"[All Fields]',
     ],
     "Beta": [
-        'txid2697049[Organism] AND "complete genome"[Title] AND "Homo sapiens"[Host]'
-        ' AND "B.1.351"[All Fields]',
+        'txid2697049[Organism] AND "complete genome"[Title] AND "Homo sapiens"[Host] AND "B.1.351"[All Fields]',
     ],
     "Gamma": [
-        'txid2697049[Organism] AND "complete genome"[Title] AND "Homo sapiens"[Host]'
-        ' AND "P.1"[All Fields]',
+        'txid2697049[Organism] AND "complete genome"[Title] AND "Homo sapiens"[Host] AND "P.1"[All Fields]',
     ],
     "Delta": [
-        'txid2697049[Organism] AND "complete genome"[Title] AND "Homo sapiens"[Host]'
-        ' AND "B.1.617.2"[All Fields]',
+        'txid2697049[Organism] AND "complete genome"[Title] AND "Homo sapiens"[Host] AND "B.1.617.2"[All Fields]',
     ],
     "Omicron": [
-        'txid2697049[Organism] AND "complete genome"[Title] AND "Homo sapiens"[Host]'
-        ' AND "B.1.1.529"[All Fields]',
+        'txid2697049[Organism] AND "complete genome"[Title] AND "Homo sapiens"[Host] AND "B.1.1.529"[All Fields]',
     ],
     "Recent": [
-        'txid2697049[Organism] AND "complete genome"[Title] AND "Homo sapiens"[Host]'
-        ' AND "JN.1"[All Fields]',
+        'txid2697049[Organism] AND "complete genome"[Title] AND "Homo sapiens"[Host] AND "JN.1"[All Fields]',
     ],
 }
 
@@ -139,10 +132,7 @@ def fetch_all_accessions(per_strain=143, seed=42):
         else:
             sampled_ids = id_list
             if len(id_list) < per_strain:
-                print(
-                    f"  [!] WARNING: Only {len(id_list)} results for {strain_name}, "
-                    f"target was {per_strain}"
-                )
+                print(f"  [!] WARNING: Only {len(id_list)} results for {strain_name}, target was {per_strain}")
 
         # Convert IDs to accession strings
         print(f"  Fetching accession names for {len(sampled_ids)} IDs...")
@@ -220,9 +210,7 @@ def print_summary(results):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Fetch balanced SARS-CoV-2 accessions from NCBI via Entrez"
-    )
+    parser = argparse.ArgumentParser(description="Fetch balanced SARS-CoV-2 accessions from NCBI via Entrez")
     parser.add_argument(
         "--email",
         type=str,
@@ -257,14 +245,12 @@ def main():
     args = parser.parse_args()
 
     if not args.email:
-        parser.error(
-            "Email is required by NCBI Entrez. Use --email or set ENTREZ_EMAIL env var."
-        )
+        parser.error("Email is required by NCBI Entrez. Use --email or set ENTREZ_EMAIL env var.")
 
     Entrez.email = args.email
     if args.api_key:
         Entrez.api_key = args.api_key
-        print(f"[*] Using API key (10 requests/sec limit)")
+        print("[*] Using API key (10 requests/sec limit)")
     else:
         print("[*] No API key set (3 requests/sec limit). Set NCBI_API_KEY for faster queries.")
 
