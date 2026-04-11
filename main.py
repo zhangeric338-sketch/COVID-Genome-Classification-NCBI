@@ -21,6 +21,7 @@ def _wandb_init(config):
     global _wandb_run
     try:
         import wandb  # type: ignore[import-untyped]
+
         run = wandb.init(project="covid-genome-classification", config=config)
         _wandb_run = run if run is not None else None
         return _wandb_run is not None
@@ -34,6 +35,7 @@ def _wandb_log(data):
         return
     try:
         import wandb  # type: ignore[import-untyped]
+
         wandb.log(data)
     except Exception:
         pass
@@ -44,6 +46,7 @@ def _wandb_log_image(key, path):
         return
     try:
         import wandb  # type: ignore[import-untyped]
+
         wandb.log({key: wandb.Image(path)})
     except Exception:
         pass
@@ -55,6 +58,7 @@ def _wandb_finish():
         return
     try:
         import wandb  # type: ignore[import-untyped]
+
         wandb.finish()
     except Exception:
         pass
@@ -118,8 +122,8 @@ def main():
     parser.add_argument(
         "--accessions-file",
         type=str,
-        default="",
-        help="Path to pre-existing accessions.json (skip Entrez search, go straight to download)",
+        default="tools/accessions.json",
+        help="Path to accessions.json (default: tools/accessions.json, ships with repo)",
     )
     parser.add_argument(
         "--train",
@@ -173,46 +177,42 @@ def main():
         return
 
     try:
-        # Determine download mode
-        use_entrez = args.fetch_accessions or args.accessions_file
+        # If --fetch-accessions, regenerate accessions.json via Entrez first
+        if args.fetch_accessions:
+            if not args.email:
+                print("[!] ERROR: --email is required with --fetch-accessions.")
+                print("[!] Usage: python main.py --fetch-accessions --email you@example.com")
+                _wandb_finish()
+                return
 
-        if use_entrez:
-            # New pipeline: Entrez search → bulk download
-            accessions_file = args.accessions_file
+            from Bio import Entrez
 
-            if not accessions_file:
-                # Step 1: Fetch accessions via Entrez
-                if not args.email:
-                    print("[!] ERROR: --email is required with --fetch-accessions.")
-                    print("[!] Usage: python main.py --fetch-accessions --email you@example.com")
-                    _wandb_finish()
-                    return
+            Entrez.email = args.email
 
-                from Bio import Entrez
-                Entrez.email = args.email
+            print(f"[*] Fetching {args.per_strain} accessions per strain via Entrez...")
+            results = fetch_all_accessions(per_strain=args.per_strain, seed=args.seed)
+            save_results(results, "tools", args.seed, args.email)
+            args.accessions_file = "tools/accessions.json"
 
-                print(f"[*] Fetching {args.per_strain} accessions per strain via Entrez...")
-                results = fetch_all_accessions(per_strain=args.per_strain, seed=args.seed)
-                save_results(results, "tools", args.seed, args.email)
-                accessions_file = "tools/accessions.json"
-
-            # Step 2: Download genomes
+        # Primary path: use accessions.json (ships with repo, 1001 genomes)
+        if os.path.exists(args.accessions_file):
+            print(f"[*] Using accessions file: {args.accessions_file}")
             dataset_path = download_genomes(
-                accessions_file=accessions_file,
+                accessions_file=args.accessions_file,
                 output_dir=args.output_dir,
                 workers=args.workers,
             )
         else:
-            # Legacy pipeline: hardcoded accessions
-            if args.full_dataset:
-                size_gb = None
-                print("[*] Full dataset mode: downloading all available accessions")
-            else:
-                size_gb = args.size_gb
-                print(f"[*] Partial dataset mode: target size {size_gb} GB")
-
+            # Fallback: hardcoded 140 accessions
+            print(f"[!] Accessions file not found: {args.accessions_file}")
+            print("[*] Falling back to hardcoded accessions (140 genomes)")
+            size_gb = None if args.full_dataset else args.size_gb
             dataset_path = download_dataset_balanced(
-                virus_name="sars-cov-2", output_dir=args.output_dir, size_gb=size_gb, seed=args.seed, workers=args.workers
+                virus_name="sars-cov-2",
+                output_dir=args.output_dir,
+                size_gb=size_gb,
+                seed=args.seed,
+                workers=args.workers,
             )
 
         # Log download metrics to wandb

@@ -7,10 +7,10 @@ Supports:
 - wandb integration for monitoring
 """
 
-from collections import Counter
 import hashlib
-from pathlib import Path
 import zipfile
+from collections import Counter
+from pathlib import Path
 
 from Bio import SeqIO  # type: ignore[import-untyped]
 from Bio.Seq import Seq  # type: ignore[import-untyped]
@@ -21,10 +21,12 @@ except ModuleNotFoundError:
     # Support running as a direct script: python src/training.py
     from visualization import get_strain_from_accession
 
+
 # Optional wandb - no-op if unavailable
 def _wandb_log(data, step=None):
     try:
         import wandb  # type: ignore[import-untyped]
+
         if wandb.run is not None:
             wandb.log(data, step=step)
     except Exception:
@@ -53,7 +55,7 @@ def load_sequence_from_zip(zip_path: Path) -> str | None:
             # Fallback: find any .fna or .fa file (prefer genomic)
             fa_names = [n for n in zf.namelist() if n.endswith(".fna") or n.endswith(".fa")]
             genomic = [n for n in fa_names if "genomic" in n.lower()]
-            for name in (genomic if genomic else fa_names):
+            for name in genomic if genomic else fa_names:
                 with zf.open(name) as f:
                     for record in SeqIO.parse(f, "fasta"):
                         return str(record.seq).upper()
@@ -81,7 +83,9 @@ def get_all_kmers(vocab: set[str]) -> list[str]:
     return sorted(vocab)
 
 
-def build_kmer_matrix(genomes: list[dict], k: int = 6, kmer_vocab: list[str] | None = None) -> tuple[list[list[float]], list[str], list[str]]:
+def build_kmer_matrix(
+    genomes: list[dict], k: int = 6, kmer_vocab: list[str] | None = None
+) -> tuple[list[list[float]], list[str], list[str]]:
     """
     Build k-mer count matrix from genome sequences.
     Returns (X, y, kmer_vocab) where X is normalized counts.
@@ -166,14 +170,16 @@ def train_random_forest(
     cm = confusion_matrix(y_test, y_pred, labels=sorted(set(y_test)))
 
     if use_wandb:
-        _wandb_log({
-            "model": "random_forest",
-            "train/accuracy": train_acc,
-            "test/accuracy": acc,
-            "test_accuracy": acc,  # backward-compatible key
-            "train_samples": len(y_train),
-            "test_samples": len(y_test),
-        })
+        _wandb_log(
+            {
+                "model": "random_forest",
+                "train/accuracy": train_acc,
+                "test/accuracy": acc,
+                "test_accuracy": acc,  # backward-compatible key
+                "train_samples": len(y_train),
+                "test_samples": len(y_test),
+            }
+        )
 
     print("\n[✓] Random Forest training complete")
     print(f"  Train accuracy: {train_acc:.4f}")
@@ -217,7 +223,11 @@ def train_mlp(
     if use_wandb and hasattr(clf, "loss_curve_"):
         for step, loss in enumerate(clf.loss_curve_):
             log_data = {"train/loss": loss}
-            if hasattr(clf, "validation_scores_") and clf.validation_scores_ is not None and step < len(clf.validation_scores_):
+            if (
+                hasattr(clf, "validation_scores_")
+                and clf.validation_scores_ is not None
+                and step < len(clf.validation_scores_)
+            ):
                 log_data["val/accuracy"] = clf.validation_scores_[step]
             _wandb_log(log_data, step=step)
 
@@ -229,14 +239,16 @@ def train_mlp(
     cm = confusion_matrix(y_test_int, y_pred_int, labels=sorted(set(y_test_int)))
 
     if use_wandb:
-        _wandb_log({
-            "model": "mlp",
-            "train/accuracy": train_acc,
-            "test/accuracy": acc,
-            "test_accuracy": acc,  # backward-compatible key
-            "train_samples": len(y_train),
-            "test_samples": len(y_test),
-        })
+        _wandb_log(
+            {
+                "model": "mlp",
+                "train/accuracy": train_acc,
+                "test/accuracy": acc,
+                "test_accuracy": acc,  # backward-compatible key
+                "train_samples": len(y_train),
+                "test_samples": len(y_test),
+            }
+        )
 
     print("\n[✓] MLP training complete")
     print(f"  Train accuracy: {train_acc:.4f}")
@@ -288,8 +300,8 @@ def run_training(
     def _seq_hash(seq: str) -> str:
         return hashlib.sha256(seq.encode("utf-8")).hexdigest()
 
-    train_seq_hashes = { _seq_hash(g["sequence"]) for g in train_genomes }
-    test_seq_hashes = { _seq_hash(g["sequence"]) for g in test_genomes }
+    train_seq_hashes = {_seq_hash(g["sequence"]) for g in train_genomes}
+    test_seq_hashes = {_seq_hash(g["sequence"]) for g in test_genomes}
     overlap_hashes = train_seq_hashes & test_seq_hashes
 
     if overlap_hashes:
@@ -300,12 +312,8 @@ def run_training(
         )
         # Optionally list a few example accessions involved in leakage
         example_hash = next(iter(overlap_hashes))
-        train_example = next(
-            g["accession"] for g in train_genomes if _seq_hash(g["sequence"]) == example_hash
-        )
-        test_example = next(
-            g["accession"] for g in test_genomes if _seq_hash(g["sequence"]) == example_hash
-        )
+        train_example = next(g["accession"] for g in train_genomes if _seq_hash(g["sequence"]) == example_hash)
+        test_example = next(g["accession"] for g in test_genomes if _seq_hash(g["sequence"]) == example_hash)
         print(f"    Example overlapping accessions (train, test): {train_example}, {test_example}")
     else:
         print("[*] No identical genome sequences detected across train and test (no direct leakage).")
@@ -324,32 +332,34 @@ def run_training(
     if use_wandb:
         try:
             import wandb  # type: ignore[import-untyped]
+
             if wandb.run is None:
-                wandb.init(project="covid-genome-classification", config={
-                    "model": model,
-                    "k": k,
-                    "train_samples": len(train_genomes),
-                    "test_samples": len(test_genomes),
-                    "kmer_vocab_size": len(kmer_vocab),
-                    "dataset_hash": dataset_hash,
-                    **kwargs,
-                })
+                wandb.init(
+                    project="covid-genome-classification",
+                    config={
+                        "model": model,
+                        "k": k,
+                        "train_samples": len(train_genomes),
+                        "test_samples": len(test_genomes),
+                        "kmer_vocab_size": len(kmer_vocab),
+                        "dataset_hash": dataset_hash,
+                        **kwargs,
+                    },
+                )
         except Exception:
             use_wandb = False
 
     if model == "random_forest":
         clf, acc = train_random_forest(X_train, y_train, X_test, y_test, use_wandb=use_wandb, **kwargs)
     elif model == "mlp":
-        clf, acc = train_mlp(
-            X_train, y_train, X_test, y_test, label_encoder,
-            use_wandb=use_wandb, **kwargs
-        )
+        clf, acc = train_mlp(X_train, y_train, X_test, y_test, label_encoder, use_wandb=use_wandb, **kwargs)
     else:
         raise ValueError(f"Unknown model: {model}. Use 'random_forest' or 'mlp'.")
 
     if use_wandb:
         try:
             import wandb  # type: ignore[import-untyped]
+
             wandb.finish()
         except Exception:
             pass
@@ -359,6 +369,7 @@ def run_training(
 
 if __name__ == "__main__":
     import argparse
+
     ap = argparse.ArgumentParser(description="Train strain classifier on existing data")
     ap.add_argument("--data-dir", "-d", default="data", help="Path to data dir with train/ and test/")
     ap.add_argument("--model", "-m", default="random_forest", choices=["random_forest", "mlp"])

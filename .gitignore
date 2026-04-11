@@ -1,3 +1,8 @@
+# Downloaded genome data (regenerate with: make data)
+data/
+*.png
+.download_manifest.json
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

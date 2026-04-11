@@ -3,6 +3,9 @@
 # Target Python 3.10+
 target-version = "py310"
 
+# Exclude generated / worktree directories
+exclude = [".claude"]
+
 # Line length to match common standards
 line-length = 120
 
