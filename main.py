@@ -10,6 +10,8 @@ from src.visualization import (
     visualize_train_test_split,
 )
 from tools.download_data import download_dataset_balanced, query_ncbi_genome_count
+from tools.download_genomes import download_genomes
+from tools.fetch_accessions import fetch_all_accessions, save_results
 
 # Optional wandb integration - no-ops if wandb unavailable or init fails
 _wandb_run = None
@@ -97,6 +99,29 @@ def main():
         help="Query NCBI for total count and estimated size of all available genomes (human host, complete-only)",
     )
     parser.add_argument(
+        "--fetch-accessions",
+        action="store_true",
+        help="Use Entrez E-utilities to search NCBI for balanced accessions (~1000 total)",
+    )
+    parser.add_argument(
+        "--email",
+        type=str,
+        default=os.environ.get("ENTREZ_EMAIL", ""),
+        help="Email for NCBI Entrez (required with --fetch-accessions). Can also set ENTREZ_EMAIL env var.",
+    )
+    parser.add_argument(
+        "--per-strain",
+        type=int,
+        default=143,
+        help="Accessions per strain when using --fetch-accessions (default: 143 for ~1001 total)",
+    )
+    parser.add_argument(
+        "--accessions-file",
+        type=str,
+        default="",
+        help="Path to pre-existing accessions.json (skip Entrez search, go straight to download)",
+    )
+    parser.add_argument(
         "--train",
         action="store_true",
         help="Run strain classification training after data pipeline (k-mer + Random Forest or MLP)",
@@ -148,18 +173,47 @@ def main():
         return
 
     try:
-        # Determine dataset size based on toggle
-        if args.full_dataset:
-            size_gb = None  # None means full dataset
-            print("[*] Full dataset mode: downloading all available accessions")
-        else:
-            size_gb = args.size_gb
-            print(f"[*] Partial dataset mode: target size {size_gb} GB")
+        # Determine download mode
+        use_entrez = args.fetch_accessions or args.accessions_file
 
-        # Download dataset (will use Drive if available)
-        dataset_path = download_dataset_balanced(
-            virus_name="sars-cov-2", output_dir=args.output_dir, size_gb=size_gb, seed=args.seed, workers=args.workers
-        )
+        if use_entrez:
+            # New pipeline: Entrez search → bulk download
+            accessions_file = args.accessions_file
+
+            if not accessions_file:
+                # Step 1: Fetch accessions via Entrez
+                if not args.email:
+                    print("[!] ERROR: --email is required with --fetch-accessions.")
+                    print("[!] Usage: python main.py --fetch-accessions --email you@example.com")
+                    _wandb_finish()
+                    return
+
+                from Bio import Entrez
+                Entrez.email = args.email
+
+                print(f"[*] Fetching {args.per_strain} accessions per strain via Entrez...")
+                results = fetch_all_accessions(per_strain=args.per_strain, seed=args.seed)
+                save_results(results, "tools", args.seed, args.email)
+                accessions_file = "tools/accessions.json"
+
+            # Step 2: Download genomes
+            dataset_path = download_genomes(
+                accessions_file=accessions_file,
+                output_dir=args.output_dir,
+                workers=args.workers,
+            )
+        else:
+            # Legacy pipeline: hardcoded accessions
+            if args.full_dataset:
+                size_gb = None
+                print("[*] Full dataset mode: downloading all available accessions")
+            else:
+                size_gb = args.size_gb
+                print(f"[*] Partial dataset mode: target size {size_gb} GB")
+
+            dataset_path = download_dataset_balanced(
+                virus_name="sars-cov-2", output_dir=args.output_dir, size_gb=size_gb, seed=args.seed, workers=args.workers
+            )
 
         # Log download metrics to wandb
         try:

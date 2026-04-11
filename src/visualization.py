@@ -13,32 +13,55 @@ except ImportError as e:
     ) from e
 
 
-def get_strain_from_accession(accession):
-    """
-    Map a genome accession number to its SARS-CoV-2 strain type.
+_STRAIN_MANIFEST = None
+_STRAIN_MANIFEST_LOADED = False
 
-    This function classifies accessions based on their prefix patterns to identify
-    the variant strain (Reference, Alpha, Beta, Gamma, Delta, Omicron, Recent).
 
-    Args:
-        accession (str): NCBI accession number (e.g., "NC_045512.2", "MT188341.1")
+def _load_strain_manifest(data_dir=None):
+    """Load strain manifest from data directory or tools/accessions.json."""
+    global _STRAIN_MANIFEST, _STRAIN_MANIFEST_LOADED
+    _STRAIN_MANIFEST_LOADED = True
 
-    Returns:
-        str: Strain type (Reference, Alpha, Beta, Gamma, Delta, Omicron, Recent, or Other)
-    """
+    # Search paths for the manifest
+    search_paths = []
+    if data_dir:
+        search_paths.append(Path(data_dir) / "strain_manifest.json")
+        search_paths.append(Path(data_dir).parent / "strain_manifest.json")
+    search_paths.append(Path("data") / "strain_manifest.json")
+    search_paths.append(Path("tools") / "accessions.json")
+
+    for path in search_paths:
+        if path.exists():
+            try:
+                with open(path) as f:
+                    data = json.load(f)
+                # accessions.json has nested structure, strain_manifest.json is flat
+                if "strains" in data:
+                    manifest = {}
+                    for strain_name, strain_data in data["strains"].items():
+                        for acc in strain_data["accessions"]:
+                            manifest[acc] = strain_name
+                    _STRAIN_MANIFEST = manifest
+                else:
+                    _STRAIN_MANIFEST = data
+                return
+            except (json.JSONDecodeError, KeyError):
+                continue
+
+
+def _legacy_get_strain_from_accession(accession):
+    """Legacy heuristic-based strain classification for backward compatibility."""
     if accession == "NC_045512.2" or accession == "NC_045512.1":
         return "Reference"
     elif accession.startswith("MT"):
-        # Check if it's Alpha (188xxx, 326xxx) or Beta (291xxx) or Reference/Early
         acc_num = accession.split(".")[0]
         if "188" in acc_num or "326" in acc_num:
             return "Alpha"
         elif "291" in acc_num:
             return "Beta"
         else:
-            return "Reference"  # Early/Reference variants
+            return "Reference"
     elif accession.startswith("MW"):
-        # Check if it's Gamma (633477-633496) or Delta (633497+)
         try:
             num = int(accession.split(".")[0].replace("MW", ""))
             if 633477 <= num <= 633496:
@@ -46,13 +69,37 @@ def get_strain_from_accession(accession):
             else:
                 return "Delta"
         except ValueError:
-            return "Delta"  # Default to Delta for MW accessions
+            return "Delta"
     elif accession.startswith("OM"):
         return "Omicron"
     elif accession.startswith("ON") or accession.startswith("OP") or accession.startswith("OR"):
         return "Recent"
     else:
         return "Other"
+
+
+def get_strain_from_accession(accession, data_dir=None):
+    """
+    Map a genome accession number to its SARS-CoV-2 strain type.
+
+    Uses strain_manifest.json (from download pipeline) if available,
+    falls back to legacy prefix-based heuristics.
+
+    Args:
+        accession (str): NCBI accession number (e.g., "NC_045512.2", "MT188341.1")
+        data_dir (str): Optional path to data directory containing strain_manifest.json
+
+    Returns:
+        str: Strain type (Reference, Alpha, Beta, Gamma, Delta, Omicron, Recent, or Other)
+    """
+    global _STRAIN_MANIFEST, _STRAIN_MANIFEST_LOADED
+    if not _STRAIN_MANIFEST_LOADED:
+        _load_strain_manifest(data_dir)
+
+    if _STRAIN_MANIFEST and accession in _STRAIN_MANIFEST:
+        return _STRAIN_MANIFEST[accession]
+
+    return _legacy_get_strain_from_accession(accession)
 
 
 def load_metadata(jsonl_path):
