@@ -2,6 +2,7 @@
 data/
 *.png
 .download_manifest.json
+visualizations/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

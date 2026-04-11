@@ -128,13 +128,12 @@ def plot_counts(df, column, title, xlabel, ylabel="Count", top_n=None):
     plt.xticks(rotation=45, ha="right")
     plt.tight_layout()
 
-    # Display in Google Colab
-    plt.show()
-
-    # Save plot as image
+    # Save plot as image (must happen before show, which clears the figure)
     filename = f"{column.lower().replace(' ', '_')}_plot.png"
     plt.savefig(filename, dpi=150, bbox_inches="tight")
     print(f"[*] Plot saved as '{filename}'")
+
+    plt.show()
 
 
 def visualize_dataset(dataset_path):
@@ -351,7 +350,9 @@ def visualize_train_test_split(data_dir):
     print("[✓] Train/test visualization complete:")
     print(f"  - Train: {len(train_files)} genomes")
     print(f"  - Test: {len(test_files)} genomes")
-    print(f"  - Split ratio: {len(test_files) / (len(train_files) + len(test_files)) * 100:.1f}% test")
+    total = len(train_files) + len(test_files)
+    if total > 0:
+        print(f"  - Split ratio: {len(test_files) / total * 100:.1f}% test")
 
 
 def visualize_dataset_composition(data_dir):

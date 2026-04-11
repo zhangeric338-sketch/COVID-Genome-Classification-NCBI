@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
 src/advanced_visualizations.py
+Standalone script — not imported by the main pipeline.
+Run directly: python -m src.advanced_visualizations
+
 Advanced genomic visualizations for SARS-CoV-2 analysis.
 
 Includes:
@@ -26,15 +29,6 @@ except ImportError as e:
     raise ImportError(
         f"Required packages not installed: {e}\nPlease install with: pip install matplotlib pandas numpy"
     ) from e
-
-# Try to import optional dependencies
-try:
-    import seaborn as sns  # noqa: F401
-
-    HAS_SEABORN = True
-except ImportError:
-    HAS_SEABORN = False
-    print("[!] Seaborn not installed. Some visualizations will use matplotlib fallback.")
 
 try:
     from Bio import Phylo
