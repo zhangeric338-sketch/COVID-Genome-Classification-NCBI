@@ -59,8 +59,8 @@ def load_sequence_from_zip(zip_path: Path) -> str | None:
                 with zf.open(name) as f:
                     for record in SeqIO.parse(f, "fasta"):
                         return str(record.seq).upper()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[!] Failed to read {zip_path}: {e}")
     return None
 
 
@@ -118,7 +118,7 @@ def build_kmer_matrix(
     return X, labels, kmer_vocab
 
 
-def load_genome_dataset(data_dir: str | Path, k: int = 6) -> tuple[list[dict], list[dict], list[str]]:
+def load_genome_dataset(data_dir: str | Path) -> tuple[list[dict], list[dict], list[str]]:
     """
     Load genomes from train/ and test/ subdirectories.
     Returns (train_genomes, test_genomes, strain_labels) where each genome dict has
@@ -271,7 +271,7 @@ def run_training(
     Main training entry point. Loads data, trains model, evaluates.
     """
     print(f"\n[*] Loading genome dataset from {data_dir}...")
-    train_genomes, test_genomes, all_labels = load_genome_dataset(data_dir, k=k)
+    train_genomes, test_genomes, all_labels = load_genome_dataset(data_dir)
 
     if not train_genomes:
         print("[!] No training data found. Run main.py first to download and split data.")

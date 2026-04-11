@@ -1,16 +1,19 @@
-# Ruff configuration for COVID Genome Classification project
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
 
-# Target Python 3.10+
+[project]
+name = "covid-genome-classification"
+version = "0.1.0"
+description = "SARS-CoV-2 genome strain classification using k-mer features"
+requires-python = ">=3.10"
+
+[tool.ruff]
 target-version = "py310"
-
-# Exclude generated / worktree directories
 exclude = [".claude"]
-
-# Line length to match common standards
 line-length = 120
 
-[lint]
-# Enable common rule sets
+[tool.ruff.lint]
 select = [
     "E",      # pycodestyle errors
     "W",      # pycodestyle warnings
@@ -20,28 +23,19 @@ select = [
     "C4",     # flake8-comprehensions
     "UP",     # pyupgrade
 ]
-
 ignore = [
     "E501",   # line too long (handled by formatter)
     "B008",   # do not perform function calls in argument defaults
     "B905",   # zip without explicit strict parameter
     "E731",   # do not assign a lambda expression, use a def
 ]
-
-# Allow autofix for all enabled rules
 fixable = ["ALL"]
 unfixable = []
 
-[lint.per-file-ignores]
-# Allow unused imports in __init__.py files
+[tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
 
-[format]
-# Use double quotes for strings
+[tool.ruff.format]
 quote-style = "double"
-
-# Indent with spaces
 indent-style = "space"
-
-# Unix-style line endings
 line-ending = "lf"
