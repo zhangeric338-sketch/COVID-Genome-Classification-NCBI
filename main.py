@@ -174,42 +174,45 @@ def main():
 
     try:
         # Determine download mode
-        use_entrez = args.fetch_accessions or args.accessions_file
+        # Default: use accessions.json if it exists, otherwise fetch via Entrez
+        accessions_file = args.accessions_file
+        default_accessions = "tools/accessions.json"
 
-        if use_entrez:
-            # New pipeline: Entrez search → bulk download
-            accessions_file = args.accessions_file
+        if args.fetch_accessions:
+            # Explicitly requested: fetch fresh accessions via Entrez
+            if not args.email:
+                print("[!] ERROR: --email is required with --fetch-accessions.")
+                print("[!] Usage: python main.py --fetch-accessions --email you@example.com")
+                _wandb_finish()
+                return
 
-            if not accessions_file:
-                # Step 1: Fetch accessions via Entrez
-                if not args.email:
-                    print("[!] ERROR: --email is required with --fetch-accessions.")
-                    print("[!] Usage: python main.py --fetch-accessions --email you@example.com")
-                    _wandb_finish()
-                    return
+            from Bio import Entrez
+            Entrez.email = args.email
 
-                from Bio import Entrez
-                Entrez.email = args.email
+            print(f"[*] Fetching {args.per_strain} accessions per strain via Entrez...")
+            results = fetch_all_accessions(per_strain=args.per_strain, seed=args.seed)
+            save_results(results, "tools", args.seed, args.email)
+            accessions_file = default_accessions
+        elif not accessions_file and os.path.exists(default_accessions):
+            # Auto-detect existing accessions.json
+            accessions_file = default_accessions
+            print(f"[*] Found existing accessions file: {accessions_file}")
 
-                print(f"[*] Fetching {args.per_strain} accessions per strain via Entrez...")
-                results = fetch_all_accessions(per_strain=args.per_strain, seed=args.seed)
-                save_results(results, "tools", args.seed, args.email)
-                accessions_file = "tools/accessions.json"
-
-            # Step 2: Download genomes
+        if accessions_file:
+            # Accessions pipeline: download from accessions.json
             dataset_path = download_genomes(
                 accessions_file=accessions_file,
                 output_dir=args.output_dir,
                 workers=args.workers,
             )
         else:
-            # Legacy pipeline: hardcoded accessions
+            # Fallback: no accessions.json found, use hardcoded accessions
+            print("[!] No accessions.json found. Using hardcoded accessions (140 genomes).")
+            print("[!] Run with --fetch-accessions --email you@example.com for the full ~1000 genome dataset.")
             if args.full_dataset:
                 size_gb = None
-                print("[*] Full dataset mode: downloading all available accessions")
             else:
                 size_gb = args.size_gb
-                print(f"[*] Partial dataset mode: target size {size_gb} GB")
 
             dataset_path = download_dataset_balanced(
                 virus_name="sars-cov-2", output_dir=args.output_dir, size_gb=size_gb, seed=args.seed, workers=args.workers

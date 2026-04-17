@@ -225,7 +225,7 @@ def split_dataset(data_dir, test_ratio=0.2, random_seed=42, balance_variants=Tru
         strain_groups = {}
         for file_path in zip_files:
             accession = file_path.stem  # Remove .zip extension
-            strain_type = get_strain_from_accession(accession)
+            strain_type = get_strain_from_accession(accession, data_dir=str(data_path))
 
             if strain_type not in strain_groups:
                 strain_groups[strain_type] = []

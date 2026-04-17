@@ -128,7 +128,7 @@ def load_genome_dataset(data_dir: str | Path, k: int = 6) -> tuple[list[dict], l
         genomes = []
         for zip_path in sorted(d.glob("*.zip")):
             accession = zip_path.stem
-            label = get_strain_from_accession(accession)
+            label = get_strain_from_accession(accession, data_dir=str(data_path))
             seq = load_sequence_from_zip(zip_path)
             if seq:
                 genomes.append({"accession": accession, "sequence": seq, "label": label})
