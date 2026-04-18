@@ -246,6 +246,7 @@ After running the pipeline, the output directory contains:
 | `download_summary.png` | Overview of downloaded data |
 | `train_test_split.png` | Train/test distribution chart |
 | `dataset_composition.png` | Detailed 4-panel variant analysis |
+| `training_runs.jsonl` | One JSON record per training run (model, metrics, provenance) |
 
 ## Examples
 

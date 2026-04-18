@@ -8,8 +8,11 @@ Supports:
 """
 
 from collections import Counter
+from datetime import datetime, timezone
 import hashlib
+import json
 from pathlib import Path
+import uuid
 import zipfile
 
 from Bio import SeqIO  # type: ignore[import-untyped]
@@ -29,6 +32,29 @@ def _wandb_log(data, step=None):
             wandb.log(data, step=step)
     except Exception:
         pass
+
+
+def _safe_float(value) -> float | None:
+    """Convert numeric-like values to float when possible."""
+    try:
+        return float(value)
+    except Exception:
+        return None
+
+
+def _write_run_record(data_dir: str | Path, record: dict) -> Path | None:
+    """
+    Append a structured training run record to data_dir/training_runs.jsonl.
+    Each line is one independent run for easy parsing and comparison.
+    """
+    try:
+        output_path = Path(data_dir) / "training_runs.jsonl"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with output_path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(record, sort_keys=True) + "\n")
+        return output_path
+    except Exception:
+        return None
 
 
 def load_sequence_from_zip(zip_path: Path) -> str | None:
@@ -153,9 +179,9 @@ def train_random_forest(
     random_state: int = 42,
     use_wandb: bool = True,
 ):
-    """Train Random Forest classifier and return fitted model + test accuracy."""
+    """Train Random Forest classifier and return fitted model + metrics payload."""
     from sklearn.ensemble import RandomForestClassifier  # type: ignore
-    from sklearn.metrics import accuracy_score, classification_report, confusion_matrix  # type: ignore
+    from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, precision_recall_fscore_support  # type: ignore
 
     clf = RandomForestClassifier(
         n_estimators=n_estimators,
@@ -167,7 +193,8 @@ def train_random_forest(
     y_pred = clf.predict(X_test)
     train_acc = accuracy_score(y_train, y_train_pred)
     acc = accuracy_score(y_test, y_pred)
-    cm = confusion_matrix(y_test, y_pred, labels=sorted(set(y_test)))
+    cm_labels = sorted(set(y_test))
+    cm = confusion_matrix(y_test, y_pred, labels=cm_labels)
 
     if use_wandb:
         _wandb_log({
@@ -186,7 +213,27 @@ def train_random_forest(
     print(classification_report(y_test, y_pred))
     print("Confusion matrix (rows=true, cols=pred, test set):")
     print(cm)
-    return clf, acc
+    precision_macro, recall_macro, f1_macro, _ = precision_recall_fscore_support(
+        y_test, y_pred, average="macro", zero_division=0
+    )
+    precision_weighted, recall_weighted, f1_weighted, _ = precision_recall_fscore_support(
+        y_test, y_pred, average="weighted", zero_division=0
+    )
+    report_dict = classification_report(y_test, y_pred, output_dict=True, zero_division=0)
+    eval_payload = {
+        "train_accuracy": float(train_acc),
+        "test_accuracy": float(acc),
+        "precision_macro": float(precision_macro),
+        "recall_macro": float(recall_macro),
+        "f1_macro": float(f1_macro),
+        "precision_weighted": float(precision_weighted),
+        "recall_weighted": float(recall_weighted),
+        "f1_weighted": float(f1_weighted),
+        "classification_report": report_dict,
+        "confusion_matrix": cm.tolist(),
+        "confusion_matrix_labels": cm_labels,
+    }
+    return clf, eval_payload
 
 
 def train_mlp(
@@ -200,8 +247,9 @@ def train_mlp(
     random_state: int = 42,
     use_wandb: bool = True,
 ):
-    """Train MLP classifier (sklearn) and return fitted model + test accuracy."""
+    """Train MLP classifier (sklearn) and return fitted model + metrics payload."""
     from sklearn.metrics import accuracy_score, classification_report, confusion_matrix  # type: ignore
+    from sklearn.metrics import precision_recall_fscore_support  # type: ignore
     from sklearn.neural_network import MLPClassifier  # type: ignore
 
     y_train_int = [label_encoder[label] for label in y_train]
@@ -230,7 +278,8 @@ def train_mlp(
     y_pred = [inv_encoder[v] for v in y_pred_int]
     train_acc = accuracy_score(y_train_int, y_train_pred_int)
     acc = accuracy_score(y_test_int, y_pred_int)
-    cm = confusion_matrix(y_test_int, y_pred_int, labels=sorted(set(y_test_int)))
+    cm_labels_int = sorted(set(y_test_int))
+    cm = confusion_matrix(y_test_int, y_pred_int, labels=cm_labels_int)
 
     if use_wandb:
         _wandb_log({
@@ -249,7 +298,27 @@ def train_mlp(
     print(classification_report(y_test, y_pred))
     print("Confusion matrix (rows=true, cols=pred, test set):")
     print(cm)
-    return clf, acc
+    precision_macro, recall_macro, f1_macro, _ = precision_recall_fscore_support(
+        y_test, y_pred, average="macro", zero_division=0
+    )
+    precision_weighted, recall_weighted, f1_weighted, _ = precision_recall_fscore_support(
+        y_test, y_pred, average="weighted", zero_division=0
+    )
+    report_dict = classification_report(y_test, y_pred, output_dict=True, zero_division=0)
+    eval_payload = {
+        "train_accuracy": float(train_acc),
+        "test_accuracy": float(acc),
+        "precision_macro": float(precision_macro),
+        "recall_macro": float(recall_macro),
+        "f1_macro": float(f1_macro),
+        "precision_weighted": float(precision_weighted),
+        "recall_weighted": float(recall_weighted),
+        "f1_weighted": float(f1_weighted),
+        "classification_report": report_dict,
+        "confusion_matrix": cm.tolist(),
+        "confusion_matrix_labels": [inv_encoder[v] for v in cm_labels_int],
+    }
+    return clf, eval_payload
 
 
 def run_training(
@@ -342,9 +411,9 @@ def run_training(
             use_wandb = False
 
     if model == "random_forest":
-        clf, acc = train_random_forest(X_train, y_train, X_test, y_test, use_wandb=use_wandb, **kwargs)
+        clf, metrics = train_random_forest(X_train, y_train, X_test, y_test, use_wandb=use_wandb, **kwargs)
     elif model == "mlp":
-        clf, acc = train_mlp(
+        clf, metrics = train_mlp(
             X_train, y_train, X_test, y_test, label_encoder,
             use_wandb=use_wandb, **kwargs
         )
@@ -357,6 +426,35 @@ def run_training(
             wandb.finish()
         except Exception:
             pass
+
+    # Persist local, structured run metadata for later comparison.
+    run_record = {
+        "run_id": str(uuid.uuid4()),
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "data_dir": str(Path(data_dir).resolve()),
+        "model": model,
+        "kmer_size": k,
+        "dataset_hash": dataset_hash,
+        "train_samples": len(train_genomes),
+        "test_samples": len(test_genomes),
+        "strain_labels": sorted(all_labels),
+        "kmer_vocab_size": len(kmer_vocab),
+        "hyperparameters": {key: _safe_float(value) if isinstance(value, (int, float)) else value for key, value in kwargs.items()},
+        "leakage_overlap_count": len(overlap_hashes),
+        "metrics": metrics,
+    }
+    output_path = _write_run_record(data_dir=data_dir, record=run_record)
+    if output_path is not None:
+        print(f"[*] Saved run metrics to {output_path}")
+        print(
+            "[*] Key test metrics: "
+            f"accuracy={metrics['test_accuracy']:.4f}, "
+            f"precision_macro={metrics['precision_macro']:.4f}, "
+            f"recall_macro={metrics['recall_macro']:.4f}, "
+            f"f1_macro={metrics['f1_macro']:.4f}"
+        )
+    else:
+        print("[!] WARNING: Failed to persist local run metrics.")
 
     return clf
 
