@@ -48,7 +48,7 @@ def install_cli_colab():
             check=True,
             capture_output=True,
         )
-        print("[✓] NCBI datasets CLI installed successfully")
+        print("[OK] NCBI datasets CLI installed successfully")
         return True
     except subprocess.CalledProcessError as e:
         print(f"[!] Failed to install CLI: {e}")
@@ -195,7 +195,7 @@ def repackage_bulk_zip(bulk_zip_path, expected_accessions, output_path):
     if failed:
         print(f"  [!] {len(failed)} accessions not found in bulk download")
 
-    print(f"  [✓] Repackaged {len(successful)} genomes into per-accession ZIPs")
+    print(f"  [OK] Repackaged {len(successful)} genomes into per-accession ZIPs")
     return successful, failed
 
 
@@ -229,37 +229,42 @@ def _parse_fasta_manual(text):
 
 
 def download_single_api(accession, output_path):
-    """Download a single genome via NCBI Datasets API v2."""
+    """Download a single genome via NCBI Entrez efetch (FASTA) and package as ZIP."""
     zip_path = output_path / f"{accession}.zip"
     if zip_path.exists():
-        return accession, True
+        # Validate existing zip has FASTA data
+        try:
+            with zipfile.ZipFile(zip_path, "r") as zf:
+                if any(n.endswith(".fna") for n in zf.namelist()):
+                    return accession, True
+            # Existing zip has no FASTA — re-download
+            zip_path.unlink()
+        except (zipfile.BadZipFile, Exception):
+            zip_path.unlink()
 
-    api_url = "https://api.ncbi.nlm.nih.gov/datasets/v2/virus/genome/download"
-    payload = {
-        "accessions": [accession],
-        "include_sequence": ["GENOME_FASTA"],
-    }
+    efetch_url = (
+        f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+        f"?db=nuccore&id={accession}&rettype=fasta&retmode=text"
+    )
 
     max_attempts = 3
     for attempt in range(1, max_attempts + 1):
         try:
-            payload_json = json.dumps(payload).encode("utf-8")
-            req = urllib.request.Request(
-                api_url,
-                data=payload_json,
-                headers={"Content-Type": "application/json", "Accept": "application/zip"},
-            )
+            req = urllib.request.Request(efetch_url)
             with urllib.request.urlopen(req, timeout=60) as response:
-                content = response.read()
+                fasta_text = response.read().decode("utf-8")
 
-            # Save and validate
+            # Validate we got a real FASTA sequence
+            if not fasta_text.startswith(">") or len(fasta_text) < 100:
+                raise RuntimeError(f"Invalid FASTA response for {accession}")
+
+            # Package into per-accession ZIP matching training pipeline format
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as out_zip:
+                out_zip.writestr("ncbi_dataset/data/genomic.fna", fasta_text)
+            buf.seek(0)
             with open(zip_path, "wb") as f:
-                f.write(content)
-
-            with zipfile.ZipFile(zip_path, "r") as zf:
-                if not zf.namelist():
-                    zip_path.unlink()
-                    raise RuntimeError("Empty ZIP")
+                f.write(buf.read())
 
             return accession, True
 
@@ -325,7 +330,7 @@ def download_genomes(accessions_file, output_dir, workers=4, batch_size=200):
     if already_have > 0:
         print(f"[*] Already downloaded: {already_have}")
     if not to_download:
-        print("[✓] All accessions already downloaded")
+        print("[OK] All accessions already downloaded")
     else:
         print(f"[*] Need to download: {len(to_download)}")
 
@@ -349,7 +354,7 @@ def download_genomes(accessions_file, output_dir, workers=4, batch_size=200):
             failed = api_failed
 
         # Final summary
-        print(f"\n[✓] Download complete:")
+        print(f"\n[OK] Download complete:")
         print(f"  Already had: {already_have}")
         print(f"  Newly downloaded: {len(successful)}")
         print(f"  Failed: {len(failed)}")
@@ -360,12 +365,12 @@ def download_genomes(accessions_file, output_dir, workers=4, batch_size=200):
     manifest_path = output_path / "strain_manifest.json"
     with open(manifest_path, "w") as f:
         json.dump(strain_map, f, indent=2)
-    print(f"[✓] Strain manifest saved to: {manifest_path}")
+    print(f"[OK] Strain manifest saved to: {manifest_path}")
 
     # Validate final state
     final_zips = {f.stem for f in output_path.glob("*.zip") if not f.name.startswith("_")}
     matched = final_zips & set(all_accessions)
-    print(f"[✓] Final dataset: {len(matched)}/{len(all_accessions)} accessions available")
+    print(f"[OK] Final dataset: {len(matched)}/{len(all_accessions)} accessions available")
 
     return str(output_path)
 

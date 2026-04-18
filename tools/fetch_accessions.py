@@ -179,7 +179,7 @@ def save_results(results, output_dir, seed, email):
     json_path = output_path / "accessions.json"
     with open(json_path, "w") as f:
         json.dump(summary, f, indent=2)
-    print(f"\n[✓] Saved accession metadata to: {json_path}")
+    print(f"\n[OK] Saved accession metadata to: {json_path}")
 
     # Save flat accession list
     txt_path = output_path / "accession_list.txt"
@@ -188,7 +188,7 @@ def save_results(results, output_dir, seed, email):
         all_accessions.extend(strain_data["accessions"])
     with open(txt_path, "w") as f:
         f.write("\n".join(sorted(all_accessions)) + "\n")
-    print(f"[✓] Saved flat accession list to: {txt_path} ({len(all_accessions)} accessions)")
+    print(f"[OK] Saved flat accession list to: {txt_path} ({len(all_accessions)} accessions)")
 
     # Save strain manifest (accession -> strain mapping)
     manifest = {}
@@ -198,7 +198,7 @@ def save_results(results, output_dir, seed, email):
     manifest_path = output_path / "strain_manifest.json"
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2)
-    print(f"[✓] Saved strain manifest to: {manifest_path}")
+    print(f"[OK] Saved strain manifest to: {manifest_path}")
 
     return json_path, txt_path, manifest_path
 

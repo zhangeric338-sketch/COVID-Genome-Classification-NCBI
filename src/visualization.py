@@ -190,7 +190,7 @@ def visualize_dataset(dataset_path):
         plt.show()
         print("[*] Plot displayed")
 
-        print(f"[✓] Visualization complete - {len(zip_files)} genomes downloaded successfully")
+        print(f"[OK] Visualization complete - {len(zip_files)} genomes downloaded successfully")
 
 
 def split_dataset(data_dir, test_ratio=0.2, random_seed=42, balance_variants=True):
@@ -294,7 +294,7 @@ def split_dataset(data_dir, test_ratio=0.2, random_seed=42, balance_variants=Tru
         shutil.copy2(file_path, test_dir / file_path.name)
 
     # Print summary
-    print("[✓] Dataset split complete:")
+    print("[OK] Dataset split complete:")
     print(f"  - Train: {train_size} files ({train_size / len(zip_files) * 100:.1f}%)")
     print(f"  - Test: {test_size} files ({test_size / len(zip_files) * 100:.1f}%)")
     print(f"  - Train directory: {train_dir}")
@@ -348,7 +348,7 @@ def visualize_train_test_split(data_dir):
     plt.show()
     print("[*] Train/test split plot displayed")
 
-    print("[✓] Train/test visualization complete:")
+    print("[OK] Train/test visualization complete:")
     print(f"  - Train: {len(train_files)} genomes")
     print(f"  - Test: {len(test_files)} genomes")
     print(f"  - Split ratio: {len(test_files) / (len(train_files) + len(test_files)) * 100:.1f}% test")
@@ -458,7 +458,7 @@ def visualize_dataset_composition(data_dir):
     print("[*] Dataset composition plot displayed")
 
     # Print detailed summary
-    print("\n[✓] Dataset Composition Analysis:")
+    print("\n[OK] Dataset Composition Analysis:")
     print(f"  Train Dataset ({total_train} genomes):")
     for variant, count in train_variants.items():
         print(f"    - {variant}: {count} genomes")
@@ -518,4 +518,4 @@ if __name__ == "__main__":
         # Display the plot
         plt.show()
         print("[*] Sample plot displayed")
-        print("[✓] Sample visualization complete!")
+        print("[OK] Sample visualization complete!")

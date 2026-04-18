@@ -239,23 +239,23 @@ def download_small_subset(output_dir):
             )
             try:
                 run_cmd(cmd)
-                print(f"    ✓ Downloaded {accession}")
+                print(f"    OK Downloaded {accession}")
             except RuntimeError as e:
-                print(f"    ✗ Failed to download {accession} via CLI: {e}")
+                print(f"    FAIL Failed to download {accession} via CLI: {e}")
                 print("    Trying API fallback...")
                 try:
                     download_genome_via_api(accession, output_path)
-                    print(f"    ✓ Downloaded {accession} via API")
+                    print(f"    OK Downloaded {accession} via API")
                 except RuntimeError as e2:
-                    print(f"    ✗ Failed to download {accession}: {e2}")
+                    print(f"    FAIL Failed to download {accession}: {e2}")
         else:
             try:
                 download_genome_via_api(accession, output_path)
-                print(f"    ✓ Downloaded {accession}")
+                print(f"    OK Downloaded {accession}")
             except RuntimeError as e:
-                print(f"    ✗ Failed to download {accession}: {e}")
+                print(f"    FAIL Failed to download {accession}: {e}")
 
-    print(f"[✓] Download complete. Files saved to: {output_path}")
+    print(f"[OK] Download complete. Files saved to: {output_path}")
     return str(output_path)
 
 
@@ -280,10 +280,10 @@ def download_single_genome(accession, output_path):
             )
             try:
                 run_cmd(cmd)
-                print(f"    ✓ Downloaded {accession}")
+                print(f"    OK Downloaded {accession}")
                 return accession, True
             except RuntimeError as e:
-                print(f"    ✗ Failed to download {accession} via CLI: {e}")
+                print(f"    FAIL Failed to download {accession} via CLI: {e}")
                 print("    Trying API fallback...")
                 # Fall through to API method
         else:
@@ -292,13 +292,13 @@ def download_single_genome(accession, output_path):
         # Use API method (fallback or primary if CLI unavailable)
         try:
             download_genome_via_api(accession, output_path)
-            print(f"    ✓ Downloaded {accession}")
+            print(f"    OK Downloaded {accession}")
             return accession, True
         except RuntimeError as e:
             if attempt == max_attempts:
-                print(f"    ✗ Failed to download {accession} after {max_attempts} attempts: {e}")
+                print(f"    FAIL Failed to download {accession} after {max_attempts} attempts: {e}")
                 return accession, False
-            print(f"    ✗ Failed to download {accession}: {e}")
+            print(f"    FAIL Failed to download {accession}: {e}")
 
     return accession, False
 
@@ -598,7 +598,7 @@ def download_dataset_balanced(virus_name="sars-cov-2", output_dir="data", size_g
     total_files = len(existing_accessions) + successful
     failed_accessions = sorted([accession for accession, success in results if not success])
 
-    print("[✓] Download complete:")
+    print("[OK] Download complete:")
     print(f"  - Already had: {len(already_downloaded)} files")
     print(f"  - Newly downloaded: {successful} successful, {failed} failed")
     print(f"  - Total files now: {total_files}")

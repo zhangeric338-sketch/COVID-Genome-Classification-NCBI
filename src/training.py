@@ -47,7 +47,9 @@ def load_sequence_from_zip(zip_path: Path) -> str | None:
             for name in candidates:
                 if name in zf.namelist():
                     with zf.open(name) as f:
-                        for record in SeqIO.parse(f, "fasta"):
+                        import io
+                        text_f = io.TextIOWrapper(f)
+                        for record in SeqIO.parse(text_f, "fasta"):
                             return str(record.seq).upper()
                     return None
             # Fallback: find any .fna or .fa file (prefer genomic)
@@ -55,7 +57,9 @@ def load_sequence_from_zip(zip_path: Path) -> str | None:
             genomic = [n for n in fa_names if "genomic" in n.lower()]
             for name in (genomic if genomic else fa_names):
                 with zf.open(name) as f:
-                    for record in SeqIO.parse(f, "fasta"):
+                    import io
+                    text_f = io.TextIOWrapper(f)
+                    for record in SeqIO.parse(text_f, "fasta"):
                         return str(record.seq).upper()
     except Exception:
         pass
@@ -175,7 +179,7 @@ def train_random_forest(
             "test_samples": len(y_test),
         })
 
-    print("\n[✓] Random Forest training complete")
+    print("\n[OK] Random Forest training complete")
     print(f"  Train accuracy: {train_acc:.4f}")
     print(f"  Test  accuracy: {acc:.4f}")
     print("\n[Classification report (test set)]")
@@ -238,7 +242,7 @@ def train_mlp(
             "test_samples": len(y_test),
         })
 
-    print("\n[✓] MLP training complete")
+    print("\n[OK] MLP training complete")
     print(f"  Train accuracy: {train_acc:.4f}")
     print(f"  Test  accuracy: {acc:.4f}")
     print("\n[Classification report (test set)]")
