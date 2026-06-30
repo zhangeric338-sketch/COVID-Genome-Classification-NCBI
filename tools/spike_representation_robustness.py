@@ -22,10 +22,10 @@ This is deliberately minimal and not production code. Run from project root:
 from __future__ import annotations
 
 import csv
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from pathlib import Path
 
 import numpy as np
 
@@ -41,7 +41,7 @@ _TEMP = Path(tempfile.gettempdir())
 NEXTCLADE_BIN = _TEMP / "nextclade.exe"
 NEXTCLADE_DATASET = _TEMP / "nextclade" / "sars-cov-2-dataset"
 
-SUB_LEVELS = [0.0, 0.01, 0.05]   # substitution rates: clean, mild, severe
+SUB_LEVELS = [0.0, 0.01, 0.05]  # substitution rates: clean, mild, severe
 K = 6
 SEED = 42
 MIN_SITE_COUNT = 2  # keep substitution sites seen in >= this many training genomes
@@ -49,10 +49,12 @@ MIN_SITE_COUNT = 2  # keep substitution sites seen in >= this many training geno
 
 def macro_f1(y_true: list[str], y_pred: list[str]) -> float:
     from sklearn.metrics import f1_score  # type: ignore
+
     return float(f1_score(y_true, y_pred, average="macro", zero_division=0))
 
 
 # ----------------------------- mutation features -----------------------------
+
 
 def _write_fasta(genomes: list[dict], path: Path) -> None:
     with path.open("w", encoding="ascii") as fh:
@@ -70,9 +72,12 @@ def run_nextclade(genomes: list[dict], tag: str, workdir: Path) -> dict[str, set
     out_tsv = workdir / f"{tag}.tsv"
     _write_fasta(genomes, fasta)
     cmd = [
-        str(NEXTCLADE_BIN), "run",
-        "--input-dataset", str(NEXTCLADE_DATASET),
-        "--output-tsv", str(out_tsv),
+        str(NEXTCLADE_BIN),
+        "run",
+        "--input-dataset",
+        str(NEXTCLADE_DATASET),
+        "--output-tsv",
+        str(out_tsv),
         "--silent",
         str(fasta),
     ]
@@ -121,7 +126,7 @@ def main() -> None:
     from sklearn.ensemble import RandomForestClassifier  # type: ignore
 
     print("[*] Loading genomes...")
-    train_genomes, test_genomes, labels = load_genome_dataset("data", k=K)
+    train_genomes, test_genomes, labels = load_genome_dataset("data")
     print(f"  Train: {len(train_genomes)}, Test: {len(test_genomes)}, strains: {sorted(labels)}")
     y_train = [g["label"] for g in train_genomes]
     y_test = [g["label"] for g in test_genomes]
@@ -153,8 +158,7 @@ def main() -> None:
     for level in SUB_LEVELS:
         rng = np.random.RandomState(SEED)
         degraded = [
-            {"accession": g["accession"], "label": g["label"],
-             "sequence": add_substitutions(g["sequence"], level, rng)}
+            {"accession": g["accession"], "label": g["label"], "sequence": add_substitutions(g["sequence"], level, rng)}
             for g in test_genomes
         ]
         # k-mer eval (frozen training vocab)

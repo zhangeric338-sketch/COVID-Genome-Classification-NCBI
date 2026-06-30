@@ -20,8 +20,8 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import numpy as np
 
@@ -43,7 +43,7 @@ def run_experiment(data_dir: str = "data", k: int = 6, seed: int = 42) -> dict:
     from sklearn.ensemble import RandomForestClassifier  # type: ignore
 
     print(f"[*] Loading genome dataset from {data_dir} ...")
-    train_genomes, test_genomes, all_labels = load_genome_dataset(data_dir, k=k)
+    train_genomes, test_genomes, all_labels = load_genome_dataset(data_dir)
     if not train_genomes or not test_genomes:
         raise SystemExit("[!] Missing train/ or test/ data. Run main.py to build the split first.")
     print(f"  Train: {len(train_genomes)} genomes, Test: {len(test_genomes)} genomes")
@@ -89,13 +89,17 @@ def run_experiment(data_dir: str = "data", k: int = 6, seed: int = 42) -> dict:
             # build_kmer_matrix drops genomes shorter than k or empty; align labels.
             acc = _accuracy(y_deg, list(clf.predict(X_deg))) if X_deg else 0.0
             usable = len(X_deg)
-            points.append({
-                "level": level,
-                "severity": severity_of(level),
-                "accuracy": acc,
-                "usable_genomes": usable,
-            })
-            print(f"  {param}={level:<6} severity={severity_of(level):.3f}  acc={acc:.4f}  ({usable}/{len(test_genomes)} usable)")
+            points.append(
+                {
+                    "level": level,
+                    "severity": severity_of(level),
+                    "accuracy": acc,
+                    "usable_genomes": usable,
+                }
+            )
+            print(
+                f"  {param}={level:<6} severity={severity_of(level):.3f}  acc={acc:.4f}  ({usable}/{len(test_genomes)} usable)"
+            )
         results["degradations"][name] = {
             "param": param,
             "xlabel": spec["xlabel"],
@@ -107,6 +111,7 @@ def run_experiment(data_dir: str = "data", k: int = 6, seed: int = 42) -> dict:
 
 def plot_results(results: dict, out_path: Path) -> None:
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
@@ -126,7 +131,7 @@ def plot_results(results: dict, out_path: Path) -> None:
         ax.grid(True, alpha=0.3)
         ax.legend(loc="lower left", fontsize=8)
     # Hide any unused axes if there are fewer than 4 degradations.
-    for ax in axes.flat[len(degradations):]:
+    for ax in axes.flat[len(degradations) :]:
         ax.axis("off")
     fig.suptitle("Strain classifier robustness to genome degradation", fontsize=14)
     fig.tight_layout(rect=(0, 0, 1, 0.97))
