@@ -14,20 +14,15 @@ from tools.download_genomes import download_genomes
 from tools.fetch_accessions import fetch_all_accessions, save_results
 
 # Optional wandb integration - no-ops if wandb unavailable or init fails
-try:
-    import wandb as _wandb  # type: ignore[import-untyped]
-except ImportError:
-    _wandb = None
-
 _wandb_run = None
 
 
 def _wandb_init(config):
     global _wandb_run
-    if _wandb is None:
-        return False
     try:
-        run = _wandb.init(project="covid-genome-classification", config=config)
+        import wandb  # type: ignore[import-untyped]
+
+        run = wandb.init(project="covid-genome-classification", config=config)
         _wandb_run = run if run is not None else None
         return _wandb_run is not None
     except Exception:
@@ -36,19 +31,23 @@ def _wandb_init(config):
 
 
 def _wandb_log(data):
-    if _wandb_run is None or _wandb is None:
+    if _wandb_run is None:
         return
     try:
-        _wandb.log(data)
+        import wandb  # type: ignore[import-untyped]
+
+        wandb.log(data)
     except Exception:
         pass
 
 
 def _wandb_log_image(key, path):
-    if _wandb_run is None or _wandb is None or not path or not os.path.isfile(path):
+    if _wandb_run is None or not path or not os.path.isfile(path):
         return
     try:
-        _wandb.log({key: _wandb.Image(path)})
+        import wandb  # type: ignore[import-untyped]
+
+        wandb.log({key: wandb.Image(path)})
     except Exception:
         pass
 
@@ -58,7 +57,9 @@ def _wandb_finish():
     if _wandb_run is None:
         return
     try:
-        _wandb.finish()
+        import wandb  # type: ignore[import-untyped]
+
+        wandb.finish()
     except Exception:
         pass
     finally:
@@ -121,8 +122,8 @@ def main():
     parser.add_argument(
         "--accessions-file",
         type=str,
-        default="tools/accessions.json",
-        help="Path to accessions.json (default: tools/accessions.json, ships with repo)",
+        default="",
+        help="Path to pre-existing accessions.json (skip Entrez search, go straight to download)",
     )
     parser.add_argument(
         "--train",
@@ -176,8 +177,13 @@ def main():
         return
 
     try:
-        # If --fetch-accessions, regenerate accessions.json via Entrez first
+        # Determine download mode
+        # Default: use accessions.json if it exists, otherwise fetch via Entrez
+        accessions_file = args.accessions_file
+        default_accessions = "tools/accessions.json"
+
         if args.fetch_accessions:
+            # Explicitly requested: fetch fresh accessions via Entrez
             if not args.email:
                 print("[!] ERROR: --email is required with --fetch-accessions.")
                 print("[!] Usage: python main.py --fetch-accessions --email you@example.com")
@@ -191,21 +197,28 @@ def main():
             print(f"[*] Fetching {args.per_strain} accessions per strain via Entrez...")
             results = fetch_all_accessions(per_strain=args.per_strain, seed=args.seed)
             save_results(results, "tools", args.seed, args.email)
-            args.accessions_file = "tools/accessions.json"
+            accessions_file = default_accessions
+        elif not accessions_file and os.path.exists(default_accessions):
+            # Auto-detect existing accessions.json
+            accessions_file = default_accessions
+            print(f"[*] Found existing accessions file: {accessions_file}")
 
-        # Primary path: use accessions.json (ships with repo, 1001 genomes)
-        if os.path.exists(args.accessions_file):
-            print(f"[*] Using accessions file: {args.accessions_file}")
+        if accessions_file:
+            # Accessions pipeline: download from accessions.json
             dataset_path = download_genomes(
-                accessions_file=args.accessions_file,
+                accessions_file=accessions_file,
                 output_dir=args.output_dir,
                 workers=args.workers,
             )
         else:
-            # Fallback: hardcoded 140 accessions
-            print(f"[!] Accessions file not found: {args.accessions_file}")
-            print("[*] Falling back to hardcoded accessions (140 genomes)")
-            size_gb = None if args.full_dataset else args.size_gb
+            # Fallback: no accessions.json found, use hardcoded accessions
+            print("[!] No accessions.json found. Using hardcoded accessions (140 genomes).")
+            print("[!] Run with --fetch-accessions --email you@example.com for the full ~1000 genome dataset.")
+            if args.full_dataset:
+                size_gb = None
+            else:
+                size_gb = args.size_gb
+
             dataset_path = download_dataset_balanced(
                 virus_name="sars-cov-2",
                 output_dir=args.output_dir,
@@ -244,20 +257,20 @@ def main():
         print("\n[*] Creating detailed dataset composition visualization...")
         visualize_dataset_composition(dataset_path)
         _wandb_log_image("split/dataset_composition", "dataset_composition.png")
-
-        # Optional training
-        if args.train:
-            print("\n" + "=" * 60)
-            print("Training strain classification model")
-            print("=" * 60)
-            run_training(
-                data_dir=dataset_path,
-                model=args.model,
-                k=args.kmer_size,
-                use_wandb=(_wandb_run is not None),
-            )
     finally:
         _wandb_finish()
+
+    # Optional training
+    if args.train:
+        print("\n" + "=" * 60)
+        print("Training strain classification model")
+        print("=" * 60)
+        run_training(
+            data_dir=dataset_path,
+            model=args.model,
+            k=args.kmer_size,
+            use_wandb=True,
+        )
 
 
 if __name__ == "__main__":
