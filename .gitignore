@@ -1,3 +1,6 @@
+# Claude Code local agent worktrees (never commit these)
+.claude/worktrees/
+
 # Downloaded genome data (regenerate with: make data)
 data/
 *.png
