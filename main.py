@@ -21,6 +21,7 @@ def _wandb_init(config):
     global _wandb_run
     try:
         import wandb  # type: ignore[import-untyped]
+
         run = wandb.init(project="covid-genome-classification", config=config)
         _wandb_run = run if run is not None else None
         return _wandb_run is not None
@@ -34,6 +35,7 @@ def _wandb_log(data):
         return
     try:
         import wandb  # type: ignore[import-untyped]
+
         wandb.log(data)
     except Exception:
         pass
@@ -44,6 +46,7 @@ def _wandb_log_image(key, path):
         return
     try:
         import wandb  # type: ignore[import-untyped]
+
         wandb.log({key: wandb.Image(path)})
     except Exception:
         pass
@@ -55,6 +58,7 @@ def _wandb_finish():
         return
     try:
         import wandb  # type: ignore[import-untyped]
+
         wandb.finish()
     except Exception:
         pass
@@ -187,6 +191,7 @@ def main():
                 return
 
             from Bio import Entrez
+
             Entrez.email = args.email
 
             print(f"[*] Fetching {args.per_strain} accessions per strain via Entrez...")
@@ -215,7 +220,11 @@ def main():
                 size_gb = args.size_gb
 
             dataset_path = download_dataset_balanced(
-                virus_name="sars-cov-2", output_dir=args.output_dir, size_gb=size_gb, seed=args.seed, workers=args.workers
+                virus_name="sars-cov-2",
+                output_dir=args.output_dir,
+                size_gb=size_gb,
+                seed=args.seed,
+                workers=args.workers,
             )
 
         # Log download metrics to wandb

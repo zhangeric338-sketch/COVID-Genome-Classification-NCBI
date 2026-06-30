@@ -209,22 +209,26 @@ def _parse_fasta_manual(text):
         if line.startswith(">"):
             if current_header:
                 acc = current_header.split()[0]
-                records.append({
-                    "id": acc,
-                    "description": current_header,
-                    "seq": "".join(current_seq),
-                })
+                records.append(
+                    {
+                        "id": acc,
+                        "description": current_header,
+                        "seq": "".join(current_seq),
+                    }
+                )
             current_header = line[1:]
             current_seq = []
         elif line:
             current_seq.append(line)
     if current_header:
         acc = current_header.split()[0]
-        records.append({
-            "id": acc,
-            "description": current_header,
-            "seq": "".join(current_seq),
-        })
+        records.append(
+            {
+                "id": acc,
+                "description": current_header,
+                "seq": "".join(current_seq),
+            }
+        )
     return records
 
 
@@ -292,10 +296,7 @@ def download_api_fallback(accessions, output_path, workers=4):
     failed = []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = {
-            executor.submit(download_single_api, acc, output_path): acc
-            for acc in accessions
-        }
+        futures = {executor.submit(download_single_api, acc, output_path): acc for acc in accessions}
         done_count = 0
         for future in concurrent.futures.as_completed(futures):
             acc, success = future.result()
@@ -354,7 +355,7 @@ def download_genomes(accessions_file, output_dir, workers=4, batch_size=200):
             failed = api_failed
 
         # Final summary
-        print(f"\n[OK] Download complete:")
+        print("\n[OK] Download complete:")
         print(f"  Already had: {already_have}")
         print(f"  Newly downloaded: {len(successful)}")
         print(f"  Failed: {len(failed)}")
@@ -376,9 +377,7 @@ def download_genomes(accessions_file, output_dir, workers=4, batch_size=200):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Bulk download SARS-CoV-2 genomes from NCBI"
-    )
+    parser = argparse.ArgumentParser(description="Bulk download SARS-CoV-2 genomes from NCBI")
     parser.add_argument(
         "--accessions-file",
         type=str,

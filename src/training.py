@@ -76,6 +76,7 @@ def load_sequence_from_zip(zip_path: Path) -> str | None:
                 if name in zf.namelist():
                     with zf.open(name) as f:
                         import io
+
                         text_f = io.TextIOWrapper(f)
                         for record in SeqIO.parse(text_f, "fasta"):
                             return str(record.seq).upper()
@@ -86,6 +87,7 @@ def load_sequence_from_zip(zip_path: Path) -> str | None:
             for name in genomic if genomic else fa_names:
                 with zf.open(name) as f:
                     import io
+
                     text_f = io.TextIOWrapper(f)
                     for record in SeqIO.parse(text_f, "fasta"):
                         return str(record.seq).upper()
@@ -185,7 +187,12 @@ def train_random_forest(
 ):
     """Train Random Forest classifier and return fitted model + metrics payload."""
     from sklearn.ensemble import RandomForestClassifier  # type: ignore
-    from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, precision_recall_fscore_support  # type: ignore
+    from sklearn.metrics import (  # type: ignore
+        accuracy_score,
+        classification_report,
+        confusion_matrix,
+        precision_recall_fscore_support,
+    )
 
     clf = RandomForestClassifier(
         n_estimators=n_estimators,
@@ -254,8 +261,12 @@ def train_mlp(
     use_wandb: bool = True,
 ):
     """Train MLP classifier (sklearn) and return fitted model + metrics payload."""
-    from sklearn.metrics import accuracy_score, classification_report, confusion_matrix  # type: ignore
-    from sklearn.metrics import precision_recall_fscore_support  # type: ignore
+    from sklearn.metrics import (  # type: ignore
+        accuracy_score,
+        classification_report,
+        confusion_matrix,
+        precision_recall_fscore_support,  # type: ignore
+    )
     from sklearn.neural_network import MLPClassifier  # type: ignore
 
     y_train_int = [label_encoder[label] for label in y_train]
@@ -425,10 +436,7 @@ def run_training(
     if model == "random_forest":
         clf, metrics = train_random_forest(X_train, y_train, X_test, y_test, use_wandb=use_wandb, **kwargs)
     elif model == "mlp":
-        clf, metrics = train_mlp(
-            X_train, y_train, X_test, y_test, label_encoder,
-            use_wandb=use_wandb, **kwargs
-        )
+        clf, metrics = train_mlp(X_train, y_train, X_test, y_test, label_encoder, use_wandb=use_wandb, **kwargs)
     else:
         raise ValueError(f"Unknown model: {model}. Use 'random_forest' or 'mlp'.")
 
@@ -452,7 +460,9 @@ def run_training(
         "test_samples": len(test_genomes),
         "strain_labels": sorted(all_labels),
         "kmer_vocab_size": len(kmer_vocab),
-        "hyperparameters": {key: _safe_float(value) if isinstance(value, (int, float)) else value for key, value in kwargs.items()},
+        "hyperparameters": {
+            key: _safe_float(value) if isinstance(value, (int, float)) else value for key, value in kwargs.items()
+        },
         "leakage_overlap_count": len(overlap_hashes),
         "metrics": metrics,
     }
